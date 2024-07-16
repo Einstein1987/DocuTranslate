@@ -47,21 +47,30 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
   <script>
     async function translateDocument() {
-    const fileInput = document.getElementById('pdfInput');
-    const file = fileInput.files[0];
-    const targetLanguage = document.getElementById('languageSelect').value;
+            const url = document.getElementById('urlInput').value;
+            const targetLanguage = document.getElementById('languageSelect').value;
+            const docId = url.match(/[-\w]{25,}/);
+            const pdfUrl = `https://docs.google.com/document/d/${docId}/export?format=pdf`;
 
-    if (!file) {
-      alert('Veuillez télécharger un fichier PDF.');
-      return;
-    }
+            try {
+                const response = await fetch(`https://cors-anywhere.herokuapp.com/${pdfUrl}`, {
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
+                });
 
-    try {
-      const reader = new FileReader();
-      reader.readAsArrayBuffer(file);
-      reader.onload = async function() {
-        const pdfData = new Uint8Array(reader.result);
-        const pdfDoc = await pdfjsLib.getDocument({ data: pdfData }).promise;
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const blob = await response.blob();
+                const urlBlob = URL.createObjectURL(blob);
+
+                const documentViewer = document.getElementById('originalDocument');
+                documentViewer.src = urlBlob;
+
+                const pdfData = new Uint8Array(await blob.arrayBuffer());
+                const pdfDoc = await pdfjsLib.getDocument({data: pdfData}).promise;
 
         let text = '';
         for (let i = 1; i <= pdfDoc.numPages; i++) {
