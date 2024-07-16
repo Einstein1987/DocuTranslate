@@ -1,4 +1,4 @@
 # .gitignore
 
 # Config file containing sensitive API keys
-conf.js
+config.json
