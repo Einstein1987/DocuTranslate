@@ -2,7 +2,7 @@ const fetch = require('node-fetch');
 
 exports.handler = async (event, context) => {
   const { text, target_lang } = JSON.parse(event.body);
-  const apiKey = process.env.DEEPL_API_KEY;
+  const DEEPL_API_KEY = process.env.DEEPL_API_KEY;
 
   try {
     const response = await fetch('https://api-free.deepl.com/v2/translate', {
