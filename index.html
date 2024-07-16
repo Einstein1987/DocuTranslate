@@ -85,7 +85,7 @@
                 translatedTextContainer.innerText = 'Traduction en cours...';
                 console.log("Texte extrait pour traduction:", text);
 
-                const translateresponse = await fetch('/.netlify/functions/translate', {
+                const translateResponse = await fetch('/.netlify/functions/translate', {
                   method: 'POST',
                   headers: {
                     'Content-Type': 'application/json',
