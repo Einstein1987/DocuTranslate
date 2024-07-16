@@ -147,8 +147,6 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.4.0/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
   <script>
-   // <script>
-    //    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.10.377/pdf.worker.min.js';
 
         async function translateDocument() {
             const url = document.getElementById('urlInput').value;
@@ -188,8 +186,8 @@
                 const translatedTextContainer = document.getElementById('translatedText');
                 translatedTextContainer.innerText = 'Traduction en cours...';
                 console.log("Texte extrait pour traduction:", text);
-
-                const apiKey = 'e77a0dd8-9400-411d-b64c-3ae4668c8cda:fx';
+                const { DEEPL_API_KEY } = require('./config');
+                //const apiKey = '';
                 const translateResponse = await fetch('https://api-free.deepl.com/v2/translate', {
                     method: 'POST',
                     headers: {
