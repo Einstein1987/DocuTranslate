@@ -1,0 +1,15 @@
+{
+  "name": "docutranslate",
+  "version": "1.0.0",
+  "description": "Une application web pour traduire des documents Google Docs et PDF",
+  "main": "index.js",
+  "dependencies": {
+    "node-fetch": "^2.6.1"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "build": "echo 'No build step required'"
+  },
+  "author": "Jérémy VIOLETTE",
+  "license": "MIT"
+}
