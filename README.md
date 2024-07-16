@@ -54,15 +54,11 @@ Pour exécuter cette application localement, suivez ces étapes :
 - **API PDF.js** : Pour afficher et extraire du texte à partir des fichiers PDF.
 - **Web Speech API** : Pour la synthèse vocale.
 
-## Contributions
-
-Les contributions sont les bienvenues ! Si vous avez des suggestions, des corrections ou des améliorations, veuillez créer une pull request ou ouvrir une issue.
-
 ## Licence
 
 Ce projet est sous licence MIT. Voir le fichier [LICENSE](LICENSE) pour plus de détails.
 
-## Auteurs
+## Auteur
 
 - **Jérémy VIOLETTE** - Professeur de Physique-Chimie, Collège La NACELLE (REP) de Corbeil-Essonnes
 
