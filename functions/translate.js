@@ -11,7 +11,7 @@ exports.handler = async (event, context) => {
         'Content-Type': 'application/x-www-form-urlencoded',
       },
       body: new URLSearchParams({
-        auth_key: apiKey,
+        auth_key: DEEPL_API_KEY,
         text: text,
         target_lang: target_lang,
       }),
