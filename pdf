@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DocuTranslate - Application de traduction de documents PDF</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 20px;
+      background-color: #f0f0f0;
+    }
+    .container {
+      position:relative;
+      display: flex;
+      max-width: 1200px;
+      margin: 0 auto;
+      background-color: white;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    }
+    .top-right {
+      position: absolute;
+      top: 5px;
+      right: 5px;
+    }
+    .top-right button {
+      background-color: #3498db;
+      color: white;
+      border: none;
+      padding: 10px;
+      border-radius: 50%;
+      cursor: pointer;
+      font-size: 16px;
+      width: 40px;
+      height: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+    }
+    .top-right button:hover {
+      background-color: #2980b9;
+    }
+    .left-pane {
+      width: 50%;
+    }
+    .right-pane {
+      width: 50%;
+      padding-left: 20px;
+    }
+    .centre {
+      text-align: center;
+    }
+    h1 {
+      color: #2c3e50;
+      text-align: center;
+    }
+    button {
+      background-color: #3498db;
+      color: white;
+      border: none;
+      padding: 10px 15px;
+      margin: 5px;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 16px;
+    }
+    button:hover {
+      background-color: #2980b9;
+    }
+    button:disabled {
+      background-color: #bdc3c7;
+      cursor: not-allowed;
+    }
+    input[type="file"], select {
+      width: calc(100% - 20px);
+      padding: 10px;
+      margin: 10px 0;
+      border-radius: 5px;
+      border: 1px solid #bdc3c7;
+      font-size: 16px;
+    }
+    iframe, .text-container {
+      width: calc(100% - 20px);
+      height: 400px;
+      border: 1px solid #bdc3c7;
+      border-radius: 5px;
+      margin-top: 10px;
+      padding: 10px;
+      overflow-y: auto;
+    }
+    .translate-button {
+      display: flex;
+      justify-content: space-between;
+    }
+    #translatedText {
+      white-space: pre-wrap; /* Cette propriété CSS permet de conserver les retours à la ligne */
+      width: calc(100% - 20px);
+      padding: 10px;
+      margin: 10px 0;
+      border-radius: 5px;
+      border: 1px solid #bdc3c7;
+      font-size: 16px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="top-right">
+      <button id="loadUrlButton" onclick="window.location.href='index.html'">URL</button>
+    </div>
+    <div class="left-pane">
+      <h1>DocuTranslate</h1>
+      <div class="input-group">
+        <input type="file" id="pdfInput" accept="application/pdf">
+      </div>
+      <div class="centre">
+        <div class="translate-button">
+          <select id="languageSelect">
+            <option value="de-DE">Allemand</option>
+            <option value="en-US">Anglais</option>
+            <option value="es-ES">Espagnol</option>
+            <option value="pt-PT">Portugais</option>
+            <option value="ru-RU">Russe</option>
+            <option value="tr-TR">Turc</option>
+            <!-- Ajoutez d'autres langues ici -->
+          </select>
+          <button onclick="translateDocument()">Traduire</button>
+        </div>
+      </div>
+      <iframe id="originalDocument" title="Document Original"></iframe>
+    </div>
+    <div class="right-pane">
+      <div id="translatedText" class="text-container"></div>
+      <div class="centre">
+        <button onclick="readTranslatedText()">🔊 Lecture du document traduit</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.10.377/pdf.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.4.0/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+  <script>
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.10.377/pdf.worker.min.js';
+
+    async function translateDocument() {
+      const fileInput = document.getElementById('pdfInput');
+      const file = fileInput.files[0];
+      const targetLanguage = document.getElementById('languageSelect').value;
+
+      if (!file) {
+        alert('Veuillez télécharger un fichier PDF.');
+        return;
+      }
+
+      try {
+        const reader = new FileReader();
+        reader.readAsArrayBuffer(file);
+        reader.onload = async function() {
+          const pdfData = new Uint8Array(reader.result);
+          const pdfDoc = await pdfjsLib.getDocument({data: pdfData}).promise;
+
+          let text = '';
+          for (let i = 1; i <= pdfDoc.numPages; i++) {
+            const page = await pdfDoc.getPage(i);
+            const textContent = await page.getTextContent();
+            textContent.items.forEach(item => {
+              text += item.str + ' ';
+            });
+          }
+
+          const documentViewer = document.getElementById('originalDocument');
+          documentViewer.src = URL.createObjectURL(new Blob([pdfData], {type: 'application/pdf'}));
+
+          const translatedTextContainer = document.getElementById('translatedText');
+          translatedTextContainer.innerText = 'Traduction en cours...';
+          console.log("Texte extrait pour traduction:", text);
+
+          const apiKey = 'e77a0dd8-9400-411d-b64c-3ae4668c8cda:fx';
+          const translateResponse = await fetch('https://api-free.deepl.com/v2/translate', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/x-www-form-urlencoded'
+            },
+            body: new URLSearchParams({
+              auth_key: apiKey,
+              text: text,
+              target_lang: targetLanguage.split('-')[0]
+            })
+          });
+
+          const translateData = await translateResponse.json();
+          console.log("Données de traduction reçues:", translateData);
+
+          if (translateData.translations && translateData.translations.length > 0) {
+            let translatedText = translateData.translations[0].text;
+            translatedText = translatedText.replace(/([.?!])\s*(?=[A-Z])/g, "$1\n");
+            translatedTextContainer.innerText = translatedText;
+          } else {
+            throw new Error('Aucune réponse valide reçue de l\'API DeepL');
+          }
+        };
+      } catch (error) {
+        console.error('Erreur lors de la traduction:', error);
+        alert('Une erreur est survenue lors de la traduction.');
+      }
+    }
+
+    function readTranslatedText() {
+      const text = document.getElementById('translatedText').innerText;
+      const targetLanguage = document.getElementById('languageSelect').value;
+
+      console.log("Texte à lire:", text);
+      console.log("Langue choisie:", targetLanguage);
+
+      const utterance = new SpeechSynthesisUtterance(text);
+      const voices = speechSynthesis.getVoices();
+      const voice = voices.find(voice => voice.lang === targetLanguage);
+      console.log("Voix trouvée:", voice);
+
+      if (voice) {
+        utterance.voice = voice;
+      }
+
+      utterance.lang = targetLanguage;
+      utterance.onstart = () => {
+        console.log("Synthèse vocale commencée");
+        document.getElementById('translatedText').style.backgroundColor = '#e0e0e0';
+      };
+      utterance.onend = () => {
+        console.log("Synthèse vocale terminée");
+        document.getElementById('translatedText').style.backgroundColor = 'transparent';
+      };
+
+      speechSynthesis.speak(utterance);
+    }
+
+    // Load voices when the page is loaded
+    window.addEventListener('load', () => {
+      const voices = speechSynthesis.getVoices();
+      console.log("Voix disponibles:", voices);
+    });
+
+    // Trigger the onvoiceschanged event to ensure voices are loaded
+    speechSynthesis.onvoiceschanged = () => {
+      const voices = speechSynthesis.getVoices();
+            console.log("Voix disponibles après changement:", voices);
+        };
+    </script>
+</body>
+</html>
