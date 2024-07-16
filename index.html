@@ -186,7 +186,7 @@
                 const translatedTextContainer = document.getElementById('translatedText');
                 translatedTextContainer.innerText = 'Traduction en cours...';
                 console.log("Texte extrait pour traduction:", text);
-                const { DEEPL_API_KEY } = require('./config');
+                const { DEEPL_API_KEY } = require('./config.js');
                 const translateResponse = await fetch('https://api-free.deepl.com/v2/translate', {
                     method: 'POST',
                     headers: {
