@@ -11,41 +11,42 @@
 <body>
   <div class="container">
     <div class="top-right">
-      <button id="loadUrlButton" onclick="window.location.href='index.html'">URL</button>
+      <button id="loadPdfButton" onclick="window.location.href='pdf.html'">PDF</button>
     </div>
     <div class="left-pane">
       <h1>DocuTranslate</h1>
       <div class="input-group">
-        <input type="file" id="pdfInput" accept="application/pdf">
+        <input type="text" id="urlInput" placeholder="URL Google Docs">
       </div>
       <div class="centre">
         <div class="translate-button">
           <select id="languageSelect">
-            <option value="de">Allemand</option>
-            <option value="en">Anglais</option>
-            <option value="es">Espagnol</option>
-            <option value="pt">Portugais</option>
-            <option value="ru">Russe</option>
-            <option value="tr">Turc</option>
+            <option value="de-DE">Allemand</option>
+            <option value="en-US">Anglais</option>
+            <option value="es-ES">Espagnol</option>
+            <option value="pt-PT">Portugais</option>
+            <option value="ru-RU">Russe</option>
+            <option value="tr-TR">Turc</option>  
+            <!-- Ajoutez d'autres langues ici -->
           </select>
           <button onclick="translateDocument()">Traduire</button>
         </div>
       </div>
-      <iframe id="originalDocument" title="Document Original"></iframe>
+        <div class="input-group">
+            <iframe id="originalDocument" title="Document Original"></iframe>
+        </div>
     </div>
     <div class="right-pane">
-      <div id="translatedText" class="text-container"></div>
-      <div class="centre">
-        <button onclick="readTranslatedText()">🔊 Lecture du document traduit</button>
-      </div>
+        <div id="translatedText" class="text-container"></div>
+        <div class="centre">
+            <button onclick="readTranslatedText()">🔊 Lecture du document traduit</button>
+        </div>
     </div>
   </div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.10.377/pdf.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.4.0/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
-  <script>
-    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.10.377/pdf.worker.min.js';
 
     async function translateDocument() {
       const fileInput = document.getElementById('pdfInput');
