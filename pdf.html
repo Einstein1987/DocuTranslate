@@ -48,19 +48,29 @@
 
     async function translateDocument() {
             const fileInput = document.getElementById('pdfInput');
-            const file = fileInput.files[0];
-            const targetLanguage = document.getElementById('languageSelect').value;
-            try {
-                const response = await fetch(`https://cors-anywhere.herokuapp.com/${pdfUrl}`, {
-                    headers: {
-                        'X-Requested-With': 'XMLHttpRequest'
-                    }
-                });
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                const blob = await response.blob();
-                const urlBlob = URL.createObjectURL(blob);
+      const file = fileInput.files[0];
+      const targetLanguage = document.getElementById('languageSelect').value;
+
+      if (!file) {
+        alert('Veuillez télécharger un fichier PDF.');
+        return;
+      }
+
+      try {
+        const reader = new FileReader();
+        reader.readAsArrayBuffer(file);
+        reader.onload = async function() {
+          const pdfData = new Uint8Array(reader.result);
+          const pdfDoc = await pdfjsLib.getDocument({data: pdfData}).promise;
+
+          let text = '';
+          for (let i = 1; i <= pdfDoc.numPages; i++) {
+            const page = await pdfDoc.getPage(i);
+            const textContent = await page.getTextContent();
+            textContent.items.forEach(item => {
+              text += item.str + ' ';
+            });
+          }
                 const documentViewer = document.getElementById('originalDocument');
                 documentViewer.src = urlBlob;
                 const pdfData = new Uint8Array(await blob.arrayBuffer());
