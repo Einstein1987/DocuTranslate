@@ -72,7 +72,7 @@
             });
           }
                 const documentViewer = document.getElementById('originalDocument');
-                documentViewer.src = urlBlob;
+                documentViewer.src = URL.createObjectURL(new Blob([pdfData], { type: 'application/pdf' }));
                 const translatedTextContainer = document.getElementById('translatedText');
                 translatedTextContainer.innerText = 'Traduction en cours...';
                 console.log("Texte extrait pour traduction:", text);
