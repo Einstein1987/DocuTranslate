@@ -73,16 +73,6 @@
           }
                 const documentViewer = document.getElementById('originalDocument');
                 documentViewer.src = urlBlob;
-                const pdfData = new Uint8Array(await blob.arrayBuffer());
-                const pdfDoc = await pdfjsLib.getDocument({data: pdfData}).promise;
-                let text = '';
-                for (let i = 1; i <= pdfDoc.numPages; i++) {
-                    const page = await pdfDoc.getPage(i);
-                    const textContent = await page.getTextContent();
-                    textContent.items.forEach(item => {
-                        text += item.str + ' ';
-                    });
-                }
                 const translatedTextContainer = document.getElementById('translatedText');
                 translatedTextContainer.innerText = 'Traduction en cours...';
                 console.log("Texte extrait pour traduction:", text);
