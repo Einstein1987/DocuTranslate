@@ -47,67 +47,70 @@
     pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.10.377/pdf.worker.min.js';
 
     async function translateDocument() {
-      const fileInput = document.getElementById('pdfInput');
-      const file = fileInput.files[0];
-      const targetLanguage = document.getElementById('languageSelect').value;
+            const url = document.getElementById('urlInput').value;
+            const targetLanguage = document.getElementById('languageSelect').value;
+            const docId = url.match(/[-\w]{25,}/);
+            const pdfUrl = `https://docs.google.com/document/d/${docId}/export?format=pdf`;
 
-      if (!file) {
-        alert('Veuillez télécharger un fichier PDF.');
-        return;
-      }
+            try {
+                const response = await fetch(`https://cors-anywhere.herokuapp.com/${pdfUrl}`, {
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
+                });
 
-      try {
-        const reader = new FileReader();
-        reader.readAsArrayBuffer(file);
-        reader.onload = async function() {
-          const pdfData = new Uint8Array(reader.result);
-          const pdfDoc = await pdfjsLib.getDocument({data: pdfData}).promise;
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
 
-          let text = '';
-          for (let i = 1; i <= pdfDoc.numPages; i++) {
-            const page = await pdfDoc.getPage(i);
-            const textContent = await page.getTextContent();
-            textContent.items.forEach(item => {
-              text += item.str + ' ';
-            });
-          }
+                const blob = await response.blob();
+                const urlBlob = URL.createObjectURL(blob);
 
-          const documentViewer = document.getElementById('originalDocument');
-          documentViewer.src = URL.createObjectURL(new Blob([pdfData], {type: 'application/pdf'}));
+                const documentViewer = document.getElementById('originalDocument');
+                documentViewer.src = urlBlob;
 
-          const translatedTextContainer = document.getElementById('translatedText');
-          translatedTextContainer.innerText = 'Traduction en cours...';
-          console.log("Texte extrait pour traduction:", text);
+                const pdfData = new Uint8Array(await blob.arrayBuffer());
+                const pdfDoc = await pdfjsLib.getDocument({data: pdfData}).promise;
 
-          const apiKey = 'e77a0dd8-9400-411d-b64c-3ae4668c8cda:fx';
-          const translateResponse = await fetch('https://api-free.deepl.com/v2/translate', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/x-www-form-urlencoded'
-            },
-            body: new URLSearchParams({
-              auth_key: apiKey,
-              text: text,
-              target_lang: targetLanguage.split('-')[0]
-            })
-          });
+                let text = '';
+                for (let i = 1; i <= pdfDoc.numPages; i++) {
+                    const page = await pdfDoc.getPage(i);
+                    const textContent = await page.getTextContent();
+                    textContent.items.forEach(item => {
+                        text += item.str + ' ';
+                    });
+                }
 
-          const translateData = await translateResponse.json();
-          console.log("Données de traduction reçues:", translateData);
+                const translatedTextContainer = document.getElementById('translatedText');
+                translatedTextContainer.innerText = 'Traduction en cours...';
+                console.log("Texte extrait pour traduction:", text);
 
-          if (translateData.translations && translateData.translations.length > 0) {
-            let translatedText = translateData.translations[0].text;
-            translatedText = translatedText.replace(/([.?!])\s*(?=[A-Z])/g, "$1\n");
-            translatedTextContainer.innerText = translatedText;
-          } else {
-            throw new Error('Aucune réponse valide reçue de l\'API DeepL');
-          }
-        };
-      } catch (error) {
-        console.error('Erreur lors de la traduction:', error);
-        alert('Une erreur est survenue lors de la traduction.');
-      }
-    }
+                const translateResponse = await fetch('/.netlify/functions/translate', {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify({
+                    text: text,
+                    target_lang: targetLanguage,
+                  }),
+                });
+
+                const translateData = await translateResponse.json();
+                console.log("Données de traduction reçues:", translateData);
+
+                if (translateData.translations && translateData.translations.length > 0) {
+                    let translatedText = translateData.translations[0].text;
+                    translatedText = translatedText.replace(/([.?!])\s*(?=[A-Z])/g, "$1\n");
+                    translatedTextContainer.innerText = translatedText;
+                } else {
+                    throw new Error('Aucune réponse valide reçue de l\'API DeepL');
+                }
+            } catch (error) {
+                console.error('Erreur lors de la traduction:', error);
+                alert('Une erreur est survenue lors de la traduction.');
+            }
+        }
 
     function readTranslatedText() {
       const text = document.getElementById('translatedText').innerText;
