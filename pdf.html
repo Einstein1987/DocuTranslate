@@ -47,31 +47,24 @@
     pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.10.377/pdf.worker.min.js';
 
     async function translateDocument() {
-            const url = document.getElementById('urlInput').value;
+            const fileInput = document.getElementById('pdfInput');
+            const file = fileInput.files[0];
             const targetLanguage = document.getElementById('languageSelect').value;
-            const docId = url.match(/[-\w]{25,}/);
-            const pdfUrl = `https://docs.google.com/document/d/${docId}/export?format=pdf`;
-
             try {
                 const response = await fetch(`https://cors-anywhere.herokuapp.com/${pdfUrl}`, {
                     headers: {
                         'X-Requested-With': 'XMLHttpRequest'
                     }
                 });
-
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);
                 }
-
                 const blob = await response.blob();
                 const urlBlob = URL.createObjectURL(blob);
-
                 const documentViewer = document.getElementById('originalDocument');
                 documentViewer.src = urlBlob;
-
                 const pdfData = new Uint8Array(await blob.arrayBuffer());
                 const pdfDoc = await pdfjsLib.getDocument({data: pdfData}).promise;
-
                 let text = '';
                 for (let i = 1; i <= pdfDoc.numPages; i++) {
                     const page = await pdfDoc.getPage(i);
@@ -80,11 +73,9 @@
                         text += item.str + ' ';
                     });
                 }
-
                 const translatedTextContainer = document.getElementById('translatedText');
                 translatedTextContainer.innerText = 'Traduction en cours...';
                 console.log("Texte extrait pour traduction:", text);
-
                 const translateResponse = await fetch('/.netlify/functions/translate', {
                   method: 'POST',
                   headers: {
@@ -95,10 +86,8 @@
                     target_lang: targetLanguage,
                   }),
                 });
-
                 const translateData = await translateResponse.json();
                 console.log("Données de traduction reçues:", translateData);
-
                 if (translateData.translations && translateData.translations.length > 0) {
                     let translatedText = translateData.translations[0].text;
                     translatedText = translatedText.replace(/([.?!])\s*(?=[A-Z])/g, "$1\n");
