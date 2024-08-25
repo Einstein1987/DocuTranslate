@@ -16,10 +16,16 @@ exports.handler = async function(event, context) {
       return { statusCode: response.status, body: 'Erreur lors de la récupération du document.' };
     }
     
-    const data = await response.text();
+    // Traiter la réponse en tant que blob pour les PDF
+    const buffer = await response.arrayBuffer();
     return {
       statusCode: 200,
-      body: data
+      headers: {
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': 'inline; filename="document.pdf"',
+      },
+      body: Buffer.from(buffer).toString('base64'),
+      isBase64Encoded: true,
     };
   } catch (error) {
     return {
