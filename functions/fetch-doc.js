@@ -1,13 +1,21 @@
 const fetch = require('node-fetch');
 
 exports.handler = async function(event, context) {
-  const { url } = JSON.parse(event.body);
-  
   try {
+    const { url } = JSON.parse(event.body);
+
+    if (!url) {
+      return {
+        statusCode: 400,
+        body: 'URL manquante dans la requête.'
+      };
+    }
+
     const response = await fetch(url);
     if (!response.ok) {
-      return { statusCode: response.status, body: 'Error fetching the document' };
+      return { statusCode: response.status, body: 'Erreur lors de la récupération du document.' };
     }
+    
     const data = await response.text();
     return {
       statusCode: 200,
@@ -16,7 +24,7 @@ exports.handler = async function(event, context) {
   } catch (error) {
     return {
       statusCode: 500,
-      body: 'Server Error: ' + error.message
+      body: 'Erreur serveur: ' + error.message
     };
   }
 };
