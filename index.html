@@ -49,16 +49,20 @@
         async function translateDocument() {
             const url = document.getElementById('urlInput').value;
             const targetLanguage = document.getElementById('languageSelect').value;
+    
+            // Extraire l'ID du document Google Docs et créer l'URL PDF
+            const docId = url.match(/[-\w]{25,}/);
+            const pdfUrl = `https://docs.google.com/document/d/${docId}/export?format=pdf`;
 
             try {
             // Envoyer l'URL à la fonction serverless pour récupérer le PDF
-              const response = await fetch('/.netlify/functions/fetch-doc', {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ url: url })
-              });
+            const response = await fetch('/.netlify/functions/fetch-doc', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ url: pdfUrl })
+            });
 
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);
