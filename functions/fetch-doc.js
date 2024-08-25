@@ -1,61 +1,35 @@
 const fetch = require('node-fetch');
 
 exports.handler = async function(event, context) {
-  if (event.httpMethod === 'OPTIONS') {
-    // Répondre aux pré-requêtes CORS
-    return {
-      statusCode: 200,
-      headers: {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Headers': 'Content-Type',
-        'Access-Control-Allow-Methods': 'POST, OPTIONS',
-      },
-      body: ''
-    };
-  }
-
   try {
     const { url } = JSON.parse(event.body);
 
     if (!url) {
       return {
         statusCode: 400,
-        headers: {
-          'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Headers': 'Content-Type',
-        },
         body: 'URL manquante dans la requête.'
       };
     }
 
     const response = await fetch(url);
     if (!response.ok) {
-      return {
-        statusCode: response.status,
-        headers: {
-          'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Headers': 'Content-Type',
-        },
-        body: 'Erreur lors de la récupération du document.'
-      };
+      return { statusCode: response.status, body: 'Erreur lors de la récupération du document.' };
     }
     
-    const data = await response.text();
+    // Traiter la réponse en tant que blob pour les PDF
+    const buffer = await response.arrayBuffer();
     return {
       statusCode: 200,
       headers: {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Headers': 'Content-Type',
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': 'inline; filename="document.pdf"',
       },
-      body: data
+      body: Buffer.from(buffer).toString('base64'),
+      isBase64Encoded: true,
     };
   } catch (error) {
     return {
       statusCode: 500,
-      headers: {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Headers': 'Content-Type',
-      },
       body: 'Erreur serveur: ' + error.message
     };
   }
