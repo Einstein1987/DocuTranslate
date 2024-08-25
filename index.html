@@ -78,53 +78,39 @@
                 const pdfDoc = await pdfjsLib.getDocument({data: pdfData}).promise;
 
                 let text = '';
-                let isHeader = true;
-              
                 for (let i = 1; i <= pdfDoc.numPages; i++) {
-            const page = await pdfDoc.getPage(i);
-            const textContent = await page.getTextContent();
-            
-            textContent.items.forEach(item => {
-                const line = item.str.trim();
-
-                // Critères pour ignorer les en-têtes basés sur la taille de la police ou d'autres critères
-                if (isHeader) {
-                    if (line.length > 20 && !line.match(/^[A-Z\s&]+$/) && !line.match(/^\s*[\d\*]+[\)\.]/)) {
-                        isHeader = false;
-                    }
+                    const page = await pdfDoc.getPage(i);
+                    const textContent = await page.getTextContent();
+                    textContent.items.forEach(item => {
+                        text += item.str + ' ';
+                    });
                 }
 
-                if (!isHeader) {
-                    text += line + ' ';
+                const translatedTextContainer = document.getElementById('translatedText');
+                translatedTextContainer.innerText = 'Traduction en cours...';
+                console.log("Texte extrait pour traduction:", text);
+
+                const translateResponse = await fetch('/.netlify/functions/translate', {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify({
+                    text: text,
+                    target_lang: targetLanguage,
+                  }),
+                });
+
+                const translateData = await translateResponse.json();
+                console.log("Données de traduction reçues:", translateData);
+
+                if (translateData.translations && translateData.translations.length > 0) {
+                    let translatedText = translateData.translations[0].text;
+                    translatedText = translatedText.replace(/([.?!])\s*(?=[A-Z])/g, "$1\n");
+                    translatedTextContainer.innerText = translatedText;
+                } else {
+                    throw new Error('Aucune réponse valide reçue de l\'API DeepL');
                 }
-            });
-        }
-
-        const translatedTextContainer = document.getElementById('translatedText');
-        translatedTextContainer.innerText = 'Traduction en cours...';
-        console.log("Texte extrait pour traduction:", text);
-
-        const translateResponse = await fetch('/.netlify/functions/translate', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                text: text,
-                target_lang: targetLanguage,
-            }),
-        });
-
-        const translateData = await translateResponse.json();
-        console.log("Données de traduction reçues:", translateData);
-
-        if (translateData.translations && translateData.translations.length > 0) {
-            let translatedText = translateData.translations[0].text;
-            translatedText = translatedText.replace(/([.?!])\s*(?=[A-Z])/g, "$1\n");
-            translatedTextContainer.innerText = translatedText;
-        } else {
-            throw new Error('Aucune réponse valide reçue de l\'API DeepL');
-        }
             } catch (error) {
                 console.error('Erreur lors de la traduction:', error);
                 alert('Une erreur est survenue lors de la traduction.');
