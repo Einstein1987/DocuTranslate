@@ -17,23 +17,32 @@ exports.handler = async function(event, context) {
 
     const response = await fetch(url);
     if (!response.ok) {
-      return { statusCode: response.status, body: 'Erreur lors de la récupération du document.' };
+      return {
+        statusCode: response.status,
+        headers: {
+          'Access-Control-Allow-Origin': '*', // Ajout de l'en-tête CORS
+          'Access-Control-Allow-Headers': 'Content-Type',
+        },
+        body: 'Erreur lors de la récupération du document.'
+      };
     }
     
-    // Traiter la réponse en tant que blob pour les PDF
-    const buffer = await response.arrayBuffer();
+    const data = await response.text();
     return {
       statusCode: 200,
       headers: {
-        'Content-Type': 'application/pdf',
-        'Content-Disposition': 'inline; filename="document.pdf"',
+        'Access-Control-Allow-Origin': '*', // Ajout de l'en-tête CORS
+        'Access-Control-Allow-Headers': 'Content-Type',
       },
-      body: Buffer.from(buffer).toString('base64'),
-      isBase64Encoded: true,
+      body: data
     };
   } catch (error) {
     return {
       statusCode: 500,
+      headers: {
+        'Access-Control-Allow-Origin': '*', // Ajout de l'en-tête CORS
+        'Access-Control-Allow-Headers': 'Content-Type',
+      },
       body: 'Erreur serveur: ' + error.message
     };
   }
