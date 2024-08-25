@@ -7,6 +7,10 @@ exports.handler = async function(event, context) {
     if (!url) {
       return {
         statusCode: 400,
+        headers: {
+          'Access-Control-Allow-Origin': '*', // Ajout de l'en-tête CORS
+          'Access-Control-Allow-Headers': 'Content-Type',
+        },
         body: 'URL manquante dans la requête.'
       };
     }
