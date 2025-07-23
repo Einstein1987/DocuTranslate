@@ -112,7 +112,8 @@
 
       const utterance = new SpeechSynthesisUtterance(text);
       const voices = speechSynthesis.getVoices();
-      const voice = voices.find(voice => voice.lang === targetLanguage);
+      const voice = voices.find(v =>
+          v.lang.toLowerCase().startsWith(targetLanguage.toLowerCase()));
       console.log("Voix trouvée:", voice);
 
       if (voice) {
