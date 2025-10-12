@@ -3,161 +3,102 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>DocuTranslate - Application de traduction de documents</title>
+  <meta name="description" content="DocuTranslate - Traduction de documents Google Docs avec synthèse vocale">
+  <title>DocuTranslate - Traduction de documents</title>
   <link rel="stylesheet" href="styles/styles.css">
 </head>
 <body>
   <div class="container">
+    <!-- Bouton de navigation -->
     <div class="top-right">
-      <button id="loadPdfButton" onclick="window.location.href='pdf.html'">PDF</button>
+      <button id="loadPdfButton" onclick="window.location.href='pdf.html'" title="Traduire un PDF">
+        📄 PDF
+      </button>
     </div>
+
+    <!-- Panneau gauche - Document original -->
     <div class="left-pane">
-      <h1>DocuTranslate</h1>
+      <h1>🌍 DocuTranslate</h1>
+      
+      <p class="subtitle">Traduction de documents Google Docs</p>
+      
+      <!-- Saisie URL -->
       <div class="input-group">
-        <input type="text" id="urlInput" placeholder="URL Google Docs">
+        <input 
+          type="text" 
+          id="urlInput" 
+          placeholder="URL du document Google Docs"
+          aria-label="URL du document Google Docs"
+        >
       </div>
-      <div class="centre">
-        <div class="translate-button">
-          <select id="languageSelect">
-            <option value="DE">Allemand</option>
-            <option value="EN">Anglais</option>
-            <option value="ES">Espagnol</option>
-            <option value="PT-PT">Portugais (Europe)</option>
-            <option value="PT-BR">Portugais (Brésil)</option>
-            <option value="RU">Russe</option>
-            <option value="TR">Turc</option>  
-            <!-- Ajoutez d'autres langues ici -->
-          </select>
-          <button onclick="translateDocument()">Traduire</button>
-        </div>
+      
+      <!-- Sélection langue et traduction -->
+      <div class="translate-section">
+        <select id="languageSelect" aria-label="Langue cible">
+          <option value="DE">🇩🇪 Allemand</option>
+          <option value="EN">🇬🇧 Anglais</option>
+          <option value="ES">🇪🇸 Espagnol</option>
+          <option value="FR">🇫🇷 Français</option>
+          <option value="IT">🇮🇹 Italien</option>
+          <option value="PT-PT">🇵🇹 Portugais (Europe)</option>
+          <option value="PT-BR">🇧🇷 Portugais (Brésil)</option>
+          <option value="RU">🇷🇺 Russe</option>
+          <option value="TR">🇹🇷 Turc</option>
+        </select>
+        <button onclick="translateDocument()" class="translate-btn">
+          🌍 Traduire
+        </button>
       </div>
-        <div class="input-group">
-            <iframe id="originalDocument" title="Document Original"></iframe>
-        </div>
+      
+      <!-- Aperçu du document original -->
+      <div class="document-container">
+        <h3>📄 Document original</h3>
+        <iframe 
+          id="originalDocument" 
+          title="Document Original"
+          aria-label="Aperçu du document original"
+        ></iframe>
+      </div>
     </div>
+
+    <!-- Panneau droit - Traduction -->
     <div class="right-pane">
-        <div id="translatedText" class="text-container"></div>
-        <div class="centre">
-            <button onclick="readTranslatedText()">🔊 Lecture du document traduit</button>
+      <h3>📝 Traduction</h3>
+      
+      <div 
+        id="translatedText" 
+        class="text-container" 
+        aria-live="polite"
+        role="region"
+        aria-label="Texte traduit"
+      >
+        <div class="placeholder">
+          <p>🌍 La traduction apparaîtra ici</p>
+          <p class="hint">Entrez une URL Google Docs et cliquez sur "Traduire"</p>
         </div>
+      </div>
+      
+      <!-- Bouton lecture vocale -->
+      <div class="centre">
+        <button onclick="readTranslatedText()" class="voice-btn">
+          🔊 Écouter la traduction
+        </button>
+      </div>
+      
+      <!-- Informations -->
+      <div class="info-box">
+        <p><strong>💡 Astuce :</strong></p>
+        <ul>
+          <li>Le document doit être <strong>public</strong></li>
+          <li>Cliquez sur "Écouter" pour la synthèse vocale</li>
+          <li>Limite : 50 000 caractères</li>
+        </ul>
+      </div>
     </div>
   </div>
+
+  <!-- Scripts -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.10.377/pdf.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.4.0/jspdf.umd.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
-    <script>
-        async function translateDocument() {
-            const url = document.getElementById('urlInput').value;
-            const targetLanguage = document.getElementById('languageSelect').value;
-    
-            // Extraire l'ID du document Google Docs et créer l'URL PDF
-            const docId = url.match(/[-\w]{25,}/);
-            const pdfUrl = `https://docs.google.com/document/d/${docId}/export?format=pdf`;
-
-            try {
-            // Envoyer l'URL à la fonction serverless pour récupérer le PDF
-            const response = await fetch('/.netlify/functions/fetch-doc', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({ url: pdfUrl })
-            });
-
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-
-                const blob = await response.blob();
-                const urlBlob = URL.createObjectURL(blob);
-
-                const documentViewer = document.getElementById('originalDocument');
-                documentViewer.src = urlBlob;
-
-                const pdfData = new Uint8Array(await blob.arrayBuffer());
-                const pdfDoc = await pdfjsLib.getDocument({data: pdfData}).promise;
-
-                let text = '';
-                for (let i = 1; i <= pdfDoc.numPages; i++) {
-                    const page = await pdfDoc.getPage(i);
-                    const textContent = await page.getTextContent();
-                    textContent.items.forEach(item => {
-                        text += item.str + ' ';
-                    });
-                }
-
-                const translatedTextContainer = document.getElementById('translatedText');
-                translatedTextContainer.innerText = 'Traduction en cours...';
-                console.log("Texte extrait pour traduction:", text);
-
-                const translateResponse = await fetch('/.netlify/functions/translate', {
-                  method: 'POST',
-                  headers: {
-                    'Content-Type': 'application/json',
-                  },
-                  body: JSON.stringify({
-                    text: text,
-                    target_lang: targetLanguage,
-                  }),
-                });
-
-                const translateData = await translateResponse.json();
-                console.log("Données de traduction reçues:", translateData);
-
-                if (translateData.translations && translateData.translations.length > 0) {
-                    let translatedText = translateData.translations[0].text;
-                    translatedText = translatedText.replace(/([.?!])\s*(?=[A-Z])/g, "$1\n");
-                    translatedTextContainer.innerText = translatedText;
-                } else {
-                    throw new Error('Aucune réponse valide reçue de l\'API DeepL');
-                }
-            } catch (error) {
-                console.error('Erreur lors de la traduction:', error);
-                alert('Une erreur est survenue lors de la traduction.');
-            }
-        }
-
-        function readTranslatedText() {
-            const text = document.getElementById('translatedText').innerText;
-            const targetLanguage = document.getElementById('languageSelect').value;
-
-            console.log("Texte à lire:", text);
-            console.log("Langue choisie:", targetLanguage);
-
-            const utterance = new SpeechSynthesisUtterance(text);
-            const voices = speechSynthesis.getVoices();
-            const voice = voices.find(v =>
-                v.lang.toLowerCase().startsWith(targetLanguage.toLowerCase()));
-            console.log("Voix trouvée:", voice);
-
-            if (voice) {
-                utterance.voice = voice;
-            }
-
-            utterance.lang = targetLanguage;
-            utterance.onstart = () => {
-                console.log("Synthèse vocale commencée");
-                document.getElementById('translatedText').style.backgroundColor = '#e0e0e0';
-            };
-            utterance.onend = () => {
-                console.log("Synthèse vocale terminée");
-                document.getElementById('translatedText').style.backgroundColor = 'transparent';
-            };
-
-            speechSynthesis.speak(utterance);
-        }
-
-        // Load voices when the page is loaded
-        window.addEventListener('load', () => {
-            const voices = speechSynthesis.getVoices();
-            console.log("Voix disponibles:", voices);
-        });
-
-        // Trigger the onvoiceschanged event to ensure voices are loaded
-        speechSynthesis.onvoiceschanged = () => {
-            const voices = speechSynthesis.getVoices();
-            console.log("Voix disponibles après changement:", voices);
-        };
-    </script>
+  <script src="scripts/docutranslate.js"></script>
 </body>
 </html>
