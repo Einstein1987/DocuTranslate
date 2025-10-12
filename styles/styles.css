@@ -115,7 +115,6 @@ body {
 .app-title {
    display: flex; /* Utilise Flexbox pour un alignement facile */
    align-items: center; /* Aligne verticalement l'image et le texte */
-   text-align: center;
    font-size: 2.5em; /* Ajustez la taille de votre titre */
 }
 
