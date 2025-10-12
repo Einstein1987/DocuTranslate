@@ -332,6 +332,11 @@ async function translatePDF() {
 // SYNTHÈSE VOCALE
 // ============================================================
 
+// Variables pour gérer la lecture par morceaux
+let currentUtteranceIndex = 0;
+let textChunks = [];
+let isReadingInProgress = false;
+
 function readTranslatedText() {
   const text = document.getElementById('translatedText').innerText;
   
@@ -343,8 +348,11 @@ function readTranslatedText() {
   const targetLanguage = document.getElementById('languageSelect').value;
   
   // Arrêter toute lecture en cours
-  if (speechSynthesis.speaking) {
+  if (speechSynthesis.speaking || isReadingInProgress) {
     speechSynthesis.cancel();
+    isReadingInProgress = false;
+    currentUtteranceIndex = 0;
+    textChunks = [];
     document.getElementById('translatedText').style.backgroundColor = 'transparent';
     showNotification('⏹️ Lecture arrêtée', 'info');
     return;
@@ -352,42 +360,101 @@ function readTranslatedText() {
   
   console.log(`Lecture de ${text.length} caractères en ${targetLanguage}`);
   
-  const utterance = new SpeechSynthesisUtterance(text);
+  // CORRECTION: Découper le texte en morceaux de maximum 200 caractères
+  // pour éviter les erreurs synthesis-failed
+  const MAX_CHUNK_LENGTH = 200;
+  
+  // Découper par phrases d'abord (plus naturel)
+  const sentences = text.match(/[^.!?]+[.!?]+/g) || [text];
+  textChunks = [];
+  let currentChunk = '';
+  
+  sentences.forEach(sentence => {
+    if ((currentChunk + sentence).length < MAX_CHUNK_LENGTH) {
+      currentChunk += sentence;
+    } else {
+      if (currentChunk) textChunks.push(currentChunk.trim());
+      currentChunk = sentence;
+    }
+  });
+  
+  if (currentChunk) textChunks.push(currentChunk.trim());
+  
+  console.log(`Texte découpé en ${textChunks.length} morceaux`);
   
   // Trouver la voix correspondante
   const voices = speechSynthesis.getVoices();
   const voice = voices.find(v => v.lang.toLowerCase().startsWith(targetLanguage.toLowerCase()));
   
   if (voice) {
-    utterance.voice = voice;
     console.log('Voix utilisée:', voice.name);
   } else {
     console.warn('Aucune voix trouvée pour', targetLanguage);
+  }
+  
+  // Démarrer la lecture
+  isReadingInProgress = true;
+  currentUtteranceIndex = 0;
+  document.getElementById('translatedText').style.backgroundColor = '#e3f2fd';
+  showNotification(`🔊 Lecture en cours... (${textChunks.length} parties)`, 'info');
+  
+  speakNextChunk(voice, targetLanguage);
+}
+
+function speakNextChunk(voice, targetLanguage) {
+  if (!isReadingInProgress || currentUtteranceIndex >= textChunks.length) {
+    // Lecture terminée
+    console.log('Synthèse vocale terminée');
+    document.getElementById('translatedText').style.backgroundColor = 'transparent';
+    isReadingInProgress = false;
+    showNotification('✅ Lecture terminée', 'success');
+    return;
+  }
+  
+  const chunk = textChunks[currentUtteranceIndex];
+  const utterance = new SpeechSynthesisUtterance(chunk);
+  
+  if (voice) {
+    utterance.voice = voice;
   }
   
   utterance.lang = targetLanguage;
   utterance.rate = 1.0;
   utterance.pitch = 1.0;
   
-  utterance.onstart = () => {
-    console.log('Synthèse vocale démarrée');
-    document.getElementById('translatedText').style.backgroundColor = '#e3f2fd';
-    showNotification('🔊 Lecture en cours...', 'info');
-  };
-  
   utterance.onend = () => {
-    console.log('Synthèse vocale terminée');
-    document.getElementById('translatedText').style.backgroundColor = 'transparent';
-    showNotification('✅ Lecture terminée', 'success');
+    currentUtteranceIndex++;
+    // Petit délai entre les morceaux pour éviter les problèmes
+    setTimeout(() => {
+      speakNextChunk(voice, targetLanguage);
+    }, 100);
   };
   
   utterance.onerror = (event) => {
-    console.error('Erreur synthèse vocale:', event.error);
-    document.getElementById('translatedText').style.backgroundColor = 'transparent';
-    showNotification('❌ Erreur lors de la lecture', 'error');
+    console.error(`Erreur synthèse vocale (morceau ${currentUtteranceIndex + 1}):`, event.error);
+    
+    // Si erreur, on essaie de continuer avec le morceau suivant
+    if (event.error === 'interrupted' || event.error === 'synthesis-failed') {
+      currentUtteranceIndex++;
+      setTimeout(() => {
+        speakNextChunk(voice, targetLanguage);
+      }, 500);
+    } else {
+      // Erreur grave, on arrête tout
+      document.getElementById('translatedText').style.backgroundColor = 'transparent';
+      isReadingInProgress = false;
+      showNotification('❌ Erreur lors de la lecture', 'error');
+    }
   };
   
-  speechSynthesis.speak(utterance);
+  try {
+    speechSynthesis.speak(utterance);
+  } catch (error) {
+    console.error('Erreur lors du speak:', error);
+    document.getElementById('translatedText').style.backgroundColor = 'transparent';
+    isReadingInProgress = false;
+    showNotification('❌ Impossible de lire le texte', 'error');
+  }
 }
 
 // ============================================================
