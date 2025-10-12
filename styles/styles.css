@@ -15,7 +15,7 @@
   --transition: all 0.3s ease;
 }
 
-* {
+{
   box-sizing: border-box;
 }
 
@@ -116,7 +116,7 @@ body {
   /* display: flex; /* Utilise Flexbox pour un alignement facile */
     /*align-items: center; /* Aligne verticalement l'image et le texte */
     /*font-size: 2em; /* Ajustez la taille de votre titre */
-/*}
+/*}*/
 
 .app-title img {
     width: 100px;  /* Ajustez la taille de l'icône */
