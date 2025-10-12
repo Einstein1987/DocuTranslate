@@ -119,8 +119,8 @@ body {
 }
 
 .app-title img {
-    width: 40px;  /* Ajustez la taille de l'icône */
-    height: 40px; /* Ajustez la taille de l'icône */
+    width: 100px;  /* Ajustez la taille de l'icône */
+    height: 100px; /* Ajustez la taille de l'icône */
     margin-right: 15px; /* Ajoute un espace entre l'icône et le texte */
 }
 
