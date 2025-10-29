@@ -1,51 +1,40 @@
 const fetch = require('node-fetch');
 
 // ============================================================
-// TRANSLATE-LIBRE.JS - API LibreTranslate (GRATUIT & ILLIMITÉ)
+// TRANSLATE-MYMEMORY.JS - API MyMemory (VRAIMENT GRATUIT)
 // ============================================================
 //
-// LibreTranslate est une solution open-source parfaite pour l'éducation :
-// ✅ Complètement gratuit
-// ✅ Pas de limite de caractères
-// ✅ Respect de la vie privée (RGPD)
-// ✅ Pas besoin de compte ni de carte bancaire
+// MyMemory Translated est une API de traduction vraiment gratuite :
+// ✅ Complètement gratuit jusqu'à 10,000 mots/jour
+// ✅ Pas de clé API requise
+// ✅ Fiable et rapide
+// ✅ Bonne qualité de traduction
 //
-// API publique : https://libretranslate.com
-// Documentation : https://libretranslate.com/docs
+// API : https://mymemory.translated.net
+// Limite : 10,000 mots/jour (largement suffisant pour un usage éducatif)
 // ============================================================
 
 const CONFIG = {
   MAX_TEXT_LENGTH: 50000,
-  RATE_LIMIT_PER_IP_HOUR: 50, // Plus généreux car API gratuite
-  REQUEST_TIMEOUT: 40000, // 40 secondes (LibreTranslate peut être plus lent)
+  RATE_LIMIT_PER_IP_HOUR: 100, // Généreux car API gratuite
+  REQUEST_TIMEOUT: 30000,
   
-  // Mapping des codes langue DeepL vers LibreTranslate
+  // Mapping des codes langue
   LANGUAGE_MAP: {
-    'DE': 'de',
-    'EN': 'en',
-    'ES': 'es',
-    'FR': 'fr',
-    'IT': 'it',
-    'PT-PT': 'pt',
-    'PT-BR': 'pt',
-    'RU': 'ru',
-    'TR': 'tr'
-  },
-  
-  // APIs LibreTranslate disponibles (la première est utilisée par défaut)
-  LIBRE_TRANSLATE_APIS: [
-    'https://libretranslate.com', // API publique officielle
-    'https://translate.argosopentech.com', // API alternative
-    // Vous pouvez ajouter votre propre instance auto-hébergée ici
-  ]
+    'DE': 'de-DE',
+    'EN': 'en-GB',
+    'ES': 'es-ES',
+    'FR': 'fr-FR',
+    'IT': 'it-IT',
+    'PT-PT': 'pt-PT',
+    'PT-BR': 'pt-BR',
+    'RU': 'ru-RU',
+    'TR': 'tr-TR'
+  }
 };
 
-// Store pour rate limiting simple
 const rateLimitStore = new Map();
 
-/**
- * Vérifie le rate limiting
- */
 function checkRateLimit(ip) {
   const now = Date.now();
   const hour = Math.floor(now / 3600000);
@@ -56,7 +45,7 @@ function checkRateLimit(ip) {
   if (count >= CONFIG.RATE_LIMIT_PER_IP_HOUR) {
     return { 
       allowed: false, 
-      error: `Limite horaire atteinte. Vous pouvez faire ${CONFIG.RATE_LIMIT_PER_IP_HOUR} traductions par heure.`
+      error: `Limite horaire atteinte (${CONFIG.RATE_LIMIT_PER_IP_HOUR} traductions/heure)`
     };
   }
   
@@ -74,105 +63,119 @@ function checkRateLimit(ip) {
 }
 
 /**
- * Appelle l'API LibreTranslate avec fallback
+ * Découpe le texte en morceaux si nécessaire (MyMemory a une limite de 500 caractères par requête)
  */
-async function translateWithLibre(text, targetLang, sourceIp) {
-  const targetLanguageCode = CONFIG.LANGUAGE_MAP[targetLang] || targetLang.toLowerCase();
+function splitText(text, maxLength = 500) {
+  if (text.length <= maxLength) {
+    return [text];
+  }
   
-  // Essayer chaque API dans l'ordre jusqu'à ce qu'une fonctionne
-  for (let i = 0; i < CONFIG.LIBRE_TRANSLATE_APIS.length; i++) {
-    const apiUrl = CONFIG.LIBRE_TRANSLATE_APIS[i];
+  const chunks = [];
+  const sentences = text.match(/[^.!?]+[.!?]+/g) || [text];
+  let currentChunk = '';
+  
+  for (const sentence of sentences) {
+    if ((currentChunk + sentence).length > maxLength && currentChunk) {
+      chunks.push(currentChunk.trim());
+      currentChunk = sentence;
+    } else {
+      currentChunk += sentence;
+    }
+  }
+  
+  if (currentChunk.trim()) {
+    chunks.push(currentChunk.trim());
+  }
+  
+  return chunks;
+}
+
+/**
+ * Traduit avec MyMemory API
+ */
+async function translateWithMyMemory(text, targetLang) {
+  const targetLanguageCode = CONFIG.LANGUAGE_MAP[targetLang] || targetLang;
+  
+  console.log(`[MyMemory] Traduction: ${text.length} chars vers ${targetLanguageCode}`);
+  
+  try {
+    // Découper le texte si nécessaire
+    const chunks = splitText(text, 500);
+    console.log(`[MyMemory] ${chunks.length} morceaux à traduire`);
     
-    try {
-      console.log(`[${new Date().toISOString()}] Tentative traduction avec ${apiUrl}...`);
+    const translations = [];
+    
+    for (let i = 0; i < chunks.length; i++) {
+      const chunk = chunks[i];
+      console.log(`[MyMemory] Traduction morceau ${i + 1}/${chunks.length} (${chunk.length} chars)`);
       
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), CONFIG.REQUEST_TIMEOUT);
 
-      const response = await fetch(`${apiUrl}/translate`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          q: text,
-          source: 'auto', // Détection automatique de la langue source
-          target: targetLanguageCode,
-          format: 'text'
-        }),
+      // Construire l'URL avec les paramètres
+      const params = new URLSearchParams({
+        q: chunk,
+        langpair: `auto|${targetLanguageCode}`
+      });
+
+      const response = await fetch(`https://api.mymemory.translated.net/get?${params}`, {
+        method: 'GET',
         signal: controller.signal
       });
 
       clearTimeout(timeout);
 
       if (!response.ok) {
-        const errorText = await response.text();
-        console.error(`Erreur ${apiUrl} [${response.status}]:`, errorText);
-        
-        // Si ce n'est pas la dernière API, essayer la suivante
-        if (i < CONFIG.LIBRE_TRANSLATE_APIS.length - 1) {
-          console.log('Tentative avec l\'API suivante...');
-          continue;
-        }
-        
-        // C'était la dernière API, retourner l'erreur
-        throw new Error(`Toutes les APIs ont échoué. Dernière erreur: ${response.status}`);
+        throw new Error(`MyMemory API erreur ${response.status}`);
       }
 
       const data = await response.json();
+      console.log(`[MyMemory] Réponse ${i + 1}:`, JSON.stringify(data).substring(0, 100));
       
-      if (!data.translatedText) {
-        throw new Error('Aucune traduction reçue de LibreTranslate');
-      }
-
-      console.log(`[${new Date().toISOString()}] Traduction réussie avec ${apiUrl} (${data.translatedText.length} chars)`);
-
-      // Retourner dans le même format que DeepL pour compatibilité
-      return {
-        translations: [{
-          text: data.translatedText,
-          detected_source_language: data.detectedLanguage?.language || 'auto'
-        }]
-      };
-
-    } catch (error) {
-      console.error(`Erreur avec ${apiUrl}:`, error.message);
-      
-      // Si c'est un timeout et qu'il reste des APIs à essayer
-      if (error.name === 'AbortError' && i < CONFIG.LIBRE_TRANSLATE_APIS.length - 1) {
-        console.log('Timeout, tentative avec l\'API suivante...');
-        continue;
+      if (!data.responseData || !data.responseData.translatedText) {
+        throw new Error('Pas de traduction dans la réponse MyMemory');
       }
       
-      // Si c'était la dernière API, propager l'erreur
-      if (i === CONFIG.LIBRE_TRANSLATE_APIS.length - 1) {
-        throw error;
+      translations.push(data.responseData.translatedText);
+      
+      // Petit délai entre les requêtes pour éviter le rate limiting
+      if (i < chunks.length - 1) {
+        await new Promise(resolve => setTimeout(resolve, 300));
       }
     }
+    
+    const fullTranslation = translations.join(' ');
+    console.log(`[MyMemory] Traduction complète: ${fullTranslation.length} chars`);
+    
+    return {
+      translations: [{
+        text: fullTranslation,
+        detected_source_language: 'auto'
+      }]
+    };
+
+  } catch (error) {
+    console.error('[MyMemory] Erreur:', error.message);
+    throw error;
   }
-  
-  throw new Error('Toutes les APIs LibreTranslate sont indisponibles');
 }
 
-/**
- * Handler principal
- */
 exports.handler = async function(event, context) {
+  console.log('[HANDLER] Nouvelle requête');
+  
   const headers = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'Content-Type',
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
     'Content-Type': 'application/json',
     'X-Content-Type-Options': 'nosniff',
-    'X-Powered-By': 'LibreTranslate'
+    'X-Powered-By': 'MyMemory'
   };
 
-  // Gérer preflight CORS
   if (event.httpMethod === 'OPTIONS') {
     return { statusCode: 200, headers, body: '' };
   }
 
-  // Vérifier méthode HTTP
   if (event.httpMethod !== 'POST') {
     return {
       statusCode: 405,
@@ -182,12 +185,10 @@ exports.handler = async function(event, context) {
   }
 
   try {
-    // Identifier le client
     const clientIp = event.headers['x-forwarded-for']?.split(',')[0].trim() || 
                      event.headers['client-ip'] || 
                      'unknown';
 
-    // Rate limiting
     const rateLimitCheck = checkRateLimit(clientIp);
     if (!rateLimitCheck.allowed) {
       return {
@@ -202,7 +203,6 @@ exports.handler = async function(event, context) {
 
     headers['X-RateLimit-Remaining'] = rateLimitCheck.remaining.toString();
 
-    // Parser le body
     let body;
     try {
       body = JSON.parse(event.body || '{}');
@@ -216,7 +216,6 @@ exports.handler = async function(event, context) {
 
     const { text, target_lang } = body;
 
-    // Validation du texte
     if (!text || typeof text !== 'string' || text.trim().length === 0) {
       return {
         statusCode: 400,
@@ -237,22 +236,19 @@ exports.handler = async function(event, context) {
       };
     }
 
-    // Validation de la langue
     if (!target_lang || !CONFIG.LANGUAGE_MAP[target_lang]) {
       return {
         statusCode: 400,
         headers,
         body: JSON.stringify({ 
-          error: `Langue non supportée. Langues disponibles : ${Object.keys(CONFIG.LANGUAGE_MAP).join(', ')}`
+          error: `Langue non supportée. Langues : ${Object.keys(CONFIG.LANGUAGE_MAP).join(', ')}`
         })
       };
     }
 
-    // Log sécurisé
-    console.log(`[${new Date().toISOString()}] LibreTranslate: ${trimmedText.length} chars → ${target_lang} (IP: ${clientIp.substring(0, 10)}...)`);
+    console.log(`[HANDLER] ${trimmedText.length} chars → ${target_lang} (IP: ${clientIp.substring(0, 10)}...)`);
 
-    // Traduction
-    const result = await translateWithLibre(trimmedText, target_lang, clientIp);
+    const result = await translateWithMyMemory(trimmedText, target_lang);
 
     return {
       statusCode: 200,
@@ -261,15 +257,14 @@ exports.handler = async function(event, context) {
     };
 
   } catch (error) {
-    console.error('Erreur serveur:', error.message);
+    console.error('[HANDLER] Erreur:', error.message);
     
-    // Gérer les timeouts
     if (error.name === 'AbortError') {
       return {
         statusCode: 504,
         headers,
         body: JSON.stringify({ 
-          error: 'Délai d\'attente dépassé. Le service de traduction est peut-être surchargé. Réessayez dans quelques instants.'
+          error: 'Timeout. Réessayez dans quelques instants.'
         })
       };
     }
@@ -278,8 +273,36 @@ exports.handler = async function(event, context) {
       statusCode: 500,
       headers,
       body: JSON.stringify({ 
-        error: 'Erreur lors de la traduction. Veuillez réessayer.'
+        error: 'Erreur lors de la traduction: ' + error.message
       })
     };
   }
 };
+
+// ============================================================
+// INSTRUCTIONS D'INSTALLATION
+// ============================================================
+//
+// 1. Remplacez functions/translate-libre.js par ce fichier
+//
+// 2. Renommez-le en translate-libre.js (gardez le même nom
+//    car docutranslate.js appelle /.netlify/functions/translate-libre)
+//
+// 3. Commit et push sur GitHub
+//
+// 4. Netlify redéploiera automatiquement
+//
+// 5. Attendez 2-3 minutes et testez !
+//
+// ✅ Avantages de MyMemory :
+// - Vraiment gratuit (10,000 mots/jour)
+// - Pas de clé API nécessaire
+// - Bonne qualité de traduction
+// - API stable et fiable
+//
+// 📊 Limite : 10,000 mots/jour
+// Pour un usage scolaire c'est largement suffisant !
+// Si vous dépassez, vous pouvez créer un compte gratuit
+// sur https://mymemory.translated.net pour augmenter la limite.
+//
+// ============================================================
