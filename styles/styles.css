@@ -117,15 +117,29 @@ body {
 .app-title {
    display: flex;
    align-items: center;
+   justify-content: center;
+   position: relative;
    font-size: 2.5em;
-   flex-wrap: wrap; /* Permet au contenu de passer à la ligne si nécessaire */
+   flex-wrap: wrap;
+   margin: 0 0 10px 0;
 }
 
 .app-title img {
+    position: absolute;
+    left: 0;
     width: 100px;
     height: 100px;
-    margin-right: 15px;
-    flex-shrink: 0; /* Empêche l'image de rétrécir */
+    flex-shrink: 0;
+}
+
+.title-text {
+    color: var(--text-dark);
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    flex: 1;
+    text-align: center;
 }
 
 h1 {
@@ -514,6 +528,10 @@ body.keyboard-navigation *:focus {
     color: #ecf0f1;
   }
   
+  .title-text {
+    color: #ecf0f1;
+  }
+  
   input[type="text"],
   select {
     background-color: #34495e;
@@ -563,6 +581,7 @@ body.keyboard-navigation *:focus {
   .app-title {
     font-size: 1.8em;
     justify-content: center;
+    padding-left: 110px; /* Espace pour le logo à gauche */
   }
   
   .app-title img {
@@ -619,6 +638,7 @@ body.keyboard-navigation *:focus {
   
   .app-title {
     font-size: 1.5em;
+    padding-left: 60px; /* Ajusté pour petits écrans */
   }
   
   .app-title img {
