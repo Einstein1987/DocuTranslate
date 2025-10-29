@@ -1,35 +1,24 @@
 const fetch = require('node-fetch');
 
 // ============================================================
-// TRANSLATE-MYMEMORY.JS - API MyMemory (VRAIMENT GRATUIT)
-// ============================================================
-//
-// MyMemory Translated est une API de traduction vraiment gratuite :
-// ✅ Complètement gratuit jusqu'à 10,000 mots/jour
-// ✅ Pas de clé API requise
-// ✅ Fiable et rapide
-// ✅ Bonne qualité de traduction
-//
-// API : https://mymemory.translated.net
-// Limite : 10,000 mots/jour (largement suffisant pour un usage éducatif)
+// TRANSLATE-MYMEMORY.JS - VERSION CORRIGÉE
 // ============================================================
 
 const CONFIG = {
   MAX_TEXT_LENGTH: 50000,
-  RATE_LIMIT_PER_IP_HOUR: 100, // Généreux car API gratuite
+  RATE_LIMIT_PER_IP_HOUR: 100,
   REQUEST_TIMEOUT: 30000,
   
-  // Mapping des codes langue
   LANGUAGE_MAP: {
-    'DE': 'de-DE',
-    'EN': 'en-GB',
-    'ES': 'es-ES',
-    'FR': 'fr-FR',
-    'IT': 'it-IT',
-    'PT-PT': 'pt-PT',
-    'PT-BR': 'pt-BR',
-    'RU': 'ru-RU',
-    'TR': 'tr-TR'
+    'DE': 'de',
+    'EN': 'en',
+    'ES': 'es',
+    'FR': 'fr',
+    'IT': 'it',
+    'PT-PT': 'pt',
+    'PT-BR': 'pt',
+    'RU': 'ru',
+    'TR': 'tr'
   }
 };
 
@@ -63,23 +52,116 @@ function checkRateLimit(ip) {
 }
 
 /**
- * Découpe le texte en morceaux si nécessaire (MyMemory a une limite de 500 caractères par requête)
+ * Détecte la langue source du texte de façon simple
  */
-function splitText(text, maxLength = 500) {
+function detectSourceLanguage(text) {
+  const sample = text.substring(0, 500).toLowerCase();
+  
+  // Mots français communs
+  const frenchWords = ['le', 'la', 'les', 'de', 'et', 'est', 'dans', 'pour', 'que', 'qui', 'avec', 'sur', 'une', 'par', 'ce', 'pas', 'mais', 'ou', 'son', 'ses'];
+  
+  // Mots anglais communs
+  const englishWords = ['the', 'and', 'is', 'in', 'to', 'of', 'that', 'it', 'for', 'on', 'with', 'as', 'was', 'at', 'be', 'this', 'have', 'from', 'or', 'by'];
+  
+  // Mots espagnols communs
+  const spanishWords = ['el', 'la', 'de', 'que', 'y', 'en', 'un', 'ser', 'se', 'no', 'por', 'con', 'para', 'una', 'su', 'como', 'del', 'los', 'al', 'más'];
+  
+  // Compter les correspondances
+  let frenchCount = 0;
+  let englishCount = 0;
+  let spanishCount = 0;
+  
+  const words = sample.split(/\s+/);
+  
+  for (const word of words) {
+    const cleanWord = word.replace(/[^a-zàâäçéèêëïîôùûüÿæœ]/g, '');
+    if (frenchWords.includes(cleanWord)) frenchCount++;
+    if (englishWords.includes(cleanWord)) englishCount++;
+    if (spanishWords.includes(cleanWord)) spanishCount++;
+  }
+  
+  console.log(`[DETECT] FR:${frenchCount} EN:${englishCount} ES:${spanishCount}`);
+  
+  // Retourner la langue avec le plus de correspondances
+  if (frenchCount >= englishCount && frenchCount >= spanishCount) {
+    return 'fr';
+  } else if (englishCount >= spanishCount) {
+    return 'en';
+  } else {
+    return 'es';
+  }
+}
+
+/**
+ * Découpe le texte en morceaux de max 450 caractères (marge de sécurité)
+ */
+function splitText(text, maxLength = 450) {
   if (text.length <= maxLength) {
     return [text];
   }
   
   const chunks = [];
-  const sentences = text.match(/[^.!?]+[.!?]+/g) || [text];
+  
+  // Découper par phrases
+  const sentences = text.match(/[^.!?]+[.!?]+/g) || [];
+  
+  // Si pas de phrases détectées, découper par mots
+  if (sentences.length === 0) {
+    const words = text.split(/\s+/);
+    let currentChunk = '';
+    
+    for (const word of words) {
+      if ((currentChunk + ' ' + word).length > maxLength && currentChunk) {
+        chunks.push(currentChunk.trim());
+        currentChunk = word;
+      } else {
+        currentChunk = currentChunk ? currentChunk + ' ' + word : word;
+      }
+    }
+    
+    if (currentChunk.trim()) {
+      chunks.push(currentChunk.trim());
+    }
+    
+    return chunks;
+  }
+  
+  // Regrouper les phrases
   let currentChunk = '';
   
   for (const sentence of sentences) {
-    if ((currentChunk + sentence).length > maxLength && currentChunk) {
-      chunks.push(currentChunk.trim());
-      currentChunk = sentence;
+    const trimmedSentence = sentence.trim();
+    
+    // Si une seule phrase est trop longue, la découper par mots
+    if (trimmedSentence.length > maxLength) {
+      if (currentChunk.trim()) {
+        chunks.push(currentChunk.trim());
+        currentChunk = '';
+      }
+      
+      const words = trimmedSentence.split(/\s+/);
+      let wordChunk = '';
+      
+      for (const word of words) {
+        if ((wordChunk + ' ' + word).length > maxLength && wordChunk) {
+          chunks.push(wordChunk.trim());
+          wordChunk = word;
+        } else {
+          wordChunk = wordChunk ? wordChunk + ' ' + word : word;
+        }
+      }
+      
+      if (wordChunk.trim()) {
+        chunks.push(wordChunk.trim());
+      }
     } else {
-      currentChunk += sentence;
+      // Ajouter la phrase au chunk actuel si ça rentre
+      if ((currentChunk + ' ' + trimmedSentence).length > maxLength && currentChunk) {
+        chunks.push(currentChunk.trim());
+        currentChunk = trimmedSentence;
+      } else {
+        currentChunk = currentChunk ? currentChunk + ' ' + trimmedSentence : trimmedSentence;
+      }
     }
   }
   
@@ -87,7 +169,7 @@ function splitText(text, maxLength = 500) {
     chunks.push(currentChunk.trim());
   }
   
-  return chunks;
+  return chunks.filter(c => c.length > 0);
 }
 
 /**
@@ -96,26 +178,30 @@ function splitText(text, maxLength = 500) {
 async function translateWithMyMemory(text, targetLang) {
   const targetLanguageCode = CONFIG.LANGUAGE_MAP[targetLang] || targetLang;
   
-  console.log(`[MyMemory] Traduction: ${text.length} chars vers ${targetLanguageCode}`);
+  // Détecter la langue source
+  const sourceLanguageCode = detectSourceLanguage(text);
+  
+  console.log(`[MyMemory] Traduction: ${text.length} chars`);
+  console.log(`[MyMemory] ${sourceLanguageCode} → ${targetLanguageCode}`);
   
   try {
-    // Découper le texte si nécessaire
-    const chunks = splitText(text, 500);
-    console.log(`[MyMemory] ${chunks.length} morceaux à traduire`);
+    // Découper le texte
+    const chunks = splitText(text, 450);
+    console.log(`[MyMemory] ${chunks.length} morceaux`);
     
     const translations = [];
     
     for (let i = 0; i < chunks.length; i++) {
       const chunk = chunks[i];
-      console.log(`[MyMemory] Traduction morceau ${i + 1}/${chunks.length} (${chunk.length} chars)`);
+      console.log(`[MyMemory] Morceau ${i + 1}/${chunks.length}: ${chunk.length} chars`);
       
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), CONFIG.REQUEST_TIMEOUT);
 
-      // Construire l'URL avec les paramètres
+      // Construire l'URL avec langpair correct
       const params = new URLSearchParams({
         q: chunk,
-        langpair: `auto|${targetLanguageCode}`
+        langpair: `${sourceLanguageCode}|${targetLanguageCode}`
       });
 
       const response = await fetch(`https://api.mymemory.translated.net/get?${params}`, {
@@ -126,42 +212,52 @@ async function translateWithMyMemory(text, targetLang) {
       clearTimeout(timeout);
 
       if (!response.ok) {
+        console.error(`[MyMemory] HTTP ${response.status}`);
         throw new Error(`MyMemory API erreur ${response.status}`);
       }
 
       const data = await response.json();
-      console.log(`[MyMemory] Réponse ${i + 1}:`, JSON.stringify(data).substring(0, 100));
       
-      if (!data.responseData || !data.responseData.translatedText) {
-        throw new Error('Pas de traduction dans la réponse MyMemory');
+      // Vérifier si c'est une erreur
+      if (data.responseStatus !== 200) {
+        console.error(`[MyMemory] Erreur:`, data);
+        throw new Error(`MyMemory erreur: ${data.responseDetails || 'Erreur inconnue'}`);
       }
       
-      translations.push(data.responseData.translatedText);
+      if (!data.responseData || !data.responseData.translatedText) {
+        console.error(`[MyMemory] Pas de traduction:`, data);
+        throw new Error('Pas de traduction dans la réponse');
+      }
       
-      // Petit délai entre les requêtes pour éviter le rate limiting
+      const translated = data.responseData.translatedText;
+      console.log(`[MyMemory] ✓ Traduit: ${translated.substring(0, 50)}...`);
+      
+      translations.push(translated);
+      
+      // Délai entre les requêtes
       if (i < chunks.length - 1) {
-        await new Promise(resolve => setTimeout(resolve, 300));
+        await new Promise(resolve => setTimeout(resolve, 500));
       }
     }
     
     const fullTranslation = translations.join(' ');
-    console.log(`[MyMemory] Traduction complète: ${fullTranslation.length} chars`);
+    console.log(`[MyMemory] ✓ Complet: ${fullTranslation.length} chars`);
     
     return {
       translations: [{
         text: fullTranslation,
-        detected_source_language: 'auto'
+        detected_source_language: sourceLanguageCode
       }]
     };
 
   } catch (error) {
-    console.error('[MyMemory] Erreur:', error.message);
+    console.error('[MyMemory] ERREUR:', error.message);
     throw error;
   }
 }
 
 exports.handler = async function(event, context) {
-  console.log('[HANDLER] Nouvelle requête');
+  console.log('[HANDLER] Requête');
   
   const headers = {
     'Access-Control-Allow-Origin': '*',
@@ -220,7 +316,7 @@ exports.handler = async function(event, context) {
       return {
         statusCode: 400,
         headers,
-        body: JSON.stringify({ error: 'Texte manquant ou invalide' })
+        body: JSON.stringify({ error: 'Texte manquant' })
       };
     }
 
@@ -231,7 +327,7 @@ exports.handler = async function(event, context) {
         statusCode: 400,
         headers,
         body: JSON.stringify({ 
-          error: `Texte trop long. Maximum : ${CONFIG.MAX_TEXT_LENGTH.toLocaleString()} caractères`
+          error: `Texte trop long (max ${CONFIG.MAX_TEXT_LENGTH} chars)`
         })
       };
     }
@@ -241,12 +337,10 @@ exports.handler = async function(event, context) {
         statusCode: 400,
         headers,
         body: JSON.stringify({ 
-          error: `Langue non supportée. Langues : ${Object.keys(CONFIG.LANGUAGE_MAP).join(', ')}`
+          error: `Langue non supportée: ${Object.keys(CONFIG.LANGUAGE_MAP).join(', ')}`
         })
       };
     }
-
-    console.log(`[HANDLER] ${trimmedText.length} chars → ${target_lang} (IP: ${clientIp.substring(0, 10)}...)`);
 
     const result = await translateWithMyMemory(trimmedText, target_lang);
 
@@ -257,14 +351,15 @@ exports.handler = async function(event, context) {
     };
 
   } catch (error) {
-    console.error('[HANDLER] Erreur:', error.message);
+    console.error('[HANDLER] ERREUR:', error.message);
+    console.error('[HANDLER] Stack:', error.stack);
     
     if (error.name === 'AbortError') {
       return {
         statusCode: 504,
         headers,
         body: JSON.stringify({ 
-          error: 'Timeout. Réessayez dans quelques instants.'
+          error: 'Timeout. Réessayez.'
         })
       };
     }
@@ -273,36 +368,8 @@ exports.handler = async function(event, context) {
       statusCode: 500,
       headers,
       body: JSON.stringify({ 
-        error: 'Erreur lors de la traduction: ' + error.message
+        error: 'Erreur: ' + error.message
       })
     };
   }
 };
-
-// ============================================================
-// INSTRUCTIONS D'INSTALLATION
-// ============================================================
-//
-// 1. Remplacez functions/translate-libre.js par ce fichier
-//
-// 2. Renommez-le en translate-libre.js (gardez le même nom
-//    car docutranslate.js appelle /.netlify/functions/translate-libre)
-//
-// 3. Commit et push sur GitHub
-//
-// 4. Netlify redéploiera automatiquement
-//
-// 5. Attendez 2-3 minutes et testez !
-//
-// ✅ Avantages de MyMemory :
-// - Vraiment gratuit (10,000 mots/jour)
-// - Pas de clé API nécessaire
-// - Bonne qualité de traduction
-// - API stable et fiable
-//
-// 📊 Limite : 10,000 mots/jour
-// Pour un usage scolaire c'est largement suffisant !
-// Si vous dépassez, vous pouvez créer un compte gratuit
-// sur https://mymemory.translated.net pour augmenter la limite.
-//
-// ============================================================
