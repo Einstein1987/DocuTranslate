@@ -15,7 +15,7 @@
   --transition: all 0.3s ease;
 }
 
-{
+* {
   box-sizing: border-box;
 }
 
@@ -91,14 +91,16 @@ body {
    ============================================================ */
 
 .left-pane {
-  width: 50%;
+  flex: 1;
+  min-width: 0; /* IMPORTANT: permet au flex item de rétrécir en dessous de sa taille de contenu */
   display: flex;
   flex-direction: column;
   gap: 20px;
 }
 
 .right-pane {
-  width: 50%;
+  flex: 1;
+  min-width: 0; /* IMPORTANT: permet au flex item de rétrécir en dessous de sa taille de contenu */
   padding-left: 0;
   display: flex;
   flex-direction: column;
@@ -113,15 +115,17 @@ body {
    TITRES
    ============================================================ */
 .app-title {
-   display: flex; /* Utilise Flexbox pour un alignement facile */
-   align-items: center; /* Aligne verticalement l'image et le texte */
-   font-size: 2.5em; /* Ajustez la taille de votre titre */
+   display: flex;
+   align-items: center;
+   font-size: 2.5em;
+   flex-wrap: wrap; /* Permet au contenu de passer à la ligne si nécessaire */
 }
 
 .app-title img {
-    width: 100px;  /* Ajustez la taille de l'icône */
-    height: 100px; /* Ajustez la taille de l'icône */
-    margin-right: 15px; /* Ajoute un espace entre l'icône et le texte */
+    width: 100px;
+    height: 100px;
+    margin-right: 15px;
+    flex-shrink: 0; /* Empêche l'image de rétrécir */
 }
 
 h1 {
@@ -133,6 +137,7 @@ h1 {
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
+  word-wrap: break-word; /* Permet la coupure des longs mots */
 }
 
 h3 {
@@ -142,6 +147,7 @@ h3 {
   display: flex;
   align-items: center;
   gap: 10px;
+  flex-wrap: wrap; /* Permet le passage à la ligne */
 }
 
 .subtitle {
@@ -169,6 +175,7 @@ button {
   transition: var(--transition);
   position: relative;
   overflow: hidden;
+  max-width: 100%; /* Empêche le débordement */
 }
 
 button::before {
@@ -211,6 +218,7 @@ button:disabled {
   flex: 1;
   font-size: 18px;
   padding: 14px 28px;
+  min-width: 0; /* Permet au bouton de rétrécir */
 }
 
 .translate-btn:hover {
@@ -243,6 +251,7 @@ select {
   font-size: 16px;
   transition: var(--transition);
   background-color: white;
+  max-width: 100%; /* Empêche le débordement */
 }
 
 input[type="text"]:focus,
@@ -278,6 +287,7 @@ input[type="file"] {
   box-shadow: var(--shadow);
   text-align: center;
   width: 100%;
+  max-width: 100%; /* Empêche le débordement */
 }
 
 .file-label:hover {
@@ -294,6 +304,7 @@ input[type="file"] {
   text-align: center;
   color: var(--text-dark);
   font-weight: 500;
+  word-wrap: break-word; /* Permet la coupure des longs noms de fichier */
 }
 
 /* ============================================================
@@ -305,15 +316,18 @@ input[type="file"] {
   gap: 10px;
   align-items: center;
   margin: 10px 0;
+  flex-wrap: wrap; /* Permet le passage à la ligne sur petits écrans */
 }
 
 .translate-section select {
   flex: 1;
+  min-width: 150px; /* Largeur minimale pour le select */
   margin: 0;
 }
 
 .translate-section button {
   margin: 0;
+  flex: 0 0 auto; /* Ne permet pas au bouton de grandir */
 }
 
 /* ============================================================
@@ -324,6 +338,7 @@ input[type="file"] {
   flex: 1;
   display: flex;
   flex-direction: column;
+  min-height: 0; /* IMPORTANT: permet au conteneur de rétrécir */
 }
 
 iframe {
@@ -344,8 +359,10 @@ iframe {
   border: 2px solid var(--border-color);
   border-radius: 10px;
   overflow-y: auto;
+  overflow-x: hidden; /* IMPORTANT: empêche le débordement horizontal */
   background: white;
   white-space: pre-wrap;
+  word-wrap: break-word; /* IMPORTANT: permet la coupure des longs mots */
   font-size: 16px;
   line-height: 1.8;
   color: var(--text-dark);
@@ -387,6 +404,7 @@ iframe {
   border-radius: 10px;
   border-left: 4px solid var(--primary-color);
   margin-top: 20px;
+  overflow-wrap: break-word; /* Permet la coupure des longs mots */
 }
 
 .info-box p {
@@ -403,6 +421,7 @@ iframe {
   margin: 8px 0;
   color: #555;
   line-height: 1.6;
+  word-wrap: break-word; /* Permet la coupure des longs mots */
 }
 
 /* ============================================================
@@ -413,6 +432,7 @@ iframe {
   display: flex;
   flex-direction: column;
   gap: 10px;
+  min-width: 0; /* Permet au groupe de rétrécir */
 }
 
 /* ============================================================
@@ -527,8 +547,27 @@ body.keyboard-navigation *:focus {
    ============================================================ */
 
 @media (max-width: 768px) {
+  body {
+    padding: 10px;
+  }
+  
+  .container {
+    padding: 20px 15px;
+    gap: 20px;
+  }
+  
   h1 {
     font-size: 2em;
+  }
+  
+  .app-title {
+    font-size: 1.8em;
+    justify-content: center;
+  }
+  
+  .app-title img {
+    width: 70px;
+    height: 70px;
   }
   
   button {
@@ -547,6 +586,11 @@ body.keyboard-navigation *:focus {
     flex-direction: column;
   }
   
+  .translate-section select,
+  .translate-section button {
+    width: 100%;
+  }
+  
   iframe,
   .text-container {
     min-height: 300px;
@@ -554,5 +598,35 @@ body.keyboard-navigation *:focus {
   
   .info-box {
     font-size: 14px;
+    padding: 15px;
+  }
+  
+  .top-right {
+    top: 10px;
+    right: 10px;
+  }
+  
+  .top-right button {
+    padding: 10px 15px;
+    font-size: 14px;
+  }
+}
+
+@media (max-width: 480px) {
+  h1 {
+    font-size: 1.5em;
+  }
+  
+  .app-title {
+    font-size: 1.5em;
+  }
+  
+  .app-title img {
+    width: 50px;
+    height: 50px;
+  }
+  
+  .info-box li {
+    font-size: 13px;
   }
 }
