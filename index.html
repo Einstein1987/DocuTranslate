@@ -82,12 +82,18 @@
         </div>
       </div>
       
-      <!-- Bouton lecture vocale -->
-      <div class="centre">
-        <button onclick="readTranslatedText()" class="voice-btn">
-          🔊 Écouter la traduction
-        </button>
-      </div>
+      <!-- Boutons d'action -->
+<div class="centre" style="display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-top: 15px;">
+  <button onclick="readTranslatedText()" class="voice-btn" style="flex: 1; min-width: 200px;">
+    🔊 Écouter
+  </button>
+  <button onclick="copyTranslation()" class="voice-btn" style="flex: 1; min-width: 200px; background: linear-gradient(135deg, #9b59b6, #8e44ad);">
+    📋 Copier
+  </button>
+  <button onclick="downloadTranslation()" class="voice-btn" style="flex: 1; min-width: 200px; background: linear-gradient(135deg, #16a085, #138d75);">
+    💾 Télécharger
+  </button>
+</div>
       
       <!-- Informations -->
       <div class="info-box">
