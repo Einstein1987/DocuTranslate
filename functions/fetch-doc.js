@@ -2,23 +2,16 @@ const fetch = require('node-fetch');
 
 // Configuration de sécurité
 const CONFIG = {
-  // Whitelist des domaines autorisés
   ALLOWED_DOMAINS: [
     'docs.google.com',
     'drive.google.com'
   ],
   
-  // Taille maximale du document (10 MB)
-  MAX_FILE_SIZE: 10 * 1024 * 1024,
-  
-  // Timeout pour la requête (30 secondes)
+  MAX_FILE_SIZE: 10 * 1024 * 1024, // 10 MB
   REQUEST_TIMEOUT: 30000,
-  
-  // Rate limiting (nombre de requêtes par IP par minute)
   RATE_LIMIT_PER_MINUTE: 10
 };
 
-// Store pour le rate limiting (en production, utilisez Redis)
 const rateLimitStore = new Map();
 
 /**
@@ -28,12 +21,10 @@ function validateUrl(urlString) {
   try {
     const url = new URL(urlString);
     
-    // Vérifier le protocole
     if (url.protocol !== 'https:') {
       return { valid: false, error: 'Seul le protocole HTTPS est autorisé' };
     }
     
-    // Vérifier le domaine
     if (!CONFIG.ALLOWED_DOMAINS.includes(url.hostname)) {
       return { 
         valid: false, 
@@ -41,7 +32,6 @@ function validateUrl(urlString) {
       };
     }
     
-    // Vérifier que c'est bien un export PDF Google Docs
     if (url.hostname === 'docs.google.com' && !url.pathname.includes('/export')) {
       return { valid: false, error: 'URL Google Docs invalide. Utilisez une URL d\'export.' };
     }
@@ -68,7 +58,7 @@ function checkRateLimit(ip) {
   
   rateLimitStore.set(key, count + 1);
   
-  // Nettoyer les anciennes entrées (garder seulement les 2 dernières minutes)
+  // Nettoyer les anciennes entrées
   for (const [storeKey] of rateLimitStore) {
     const keyMinute = parseInt(storeKey.split('-')[1]);
     if (keyMinute < minute - 2) {
@@ -77,6 +67,29 @@ function checkRateLimit(ip) {
   }
   
   return { allowed: true };
+}
+
+/**
+ * Valide le magic number PDF (en-tête du fichier)
+ * Un vrai PDF commence TOUJOURS par %PDF-
+ */
+function validatePDFMagicNumber(buffer) {
+  if (!buffer || buffer.length < 5) {
+    return false;
+  }
+  
+  // Vérifier les 5 premiers octets : %PDF-
+  // % = 0x25, P = 0x50, D = 0x44, F = 0x46, - = 0x2D
+  const pdfSignature = Buffer.from([0x25, 0x50, 0x44, 0x46, 0x2D]);
+  
+  // Comparer les 5 premiers octets
+  for (let i = 0; i < 5; i++) {
+    if (buffer[i] !== pdfSignature[i]) {
+      return false;
+    }
+  }
+  
+  return true;
 }
 
 /**
@@ -110,7 +123,7 @@ async function fetchDocumentWithLimits(url) {
     if (!contentType || !contentType.includes('application/pdf')) {
       return {
         success: false,
-        error: 'Le document doit être un PDF'
+        error: 'Le document doit être un PDF (Content-Type invalide)'
       };
     }
 
@@ -142,6 +155,17 @@ async function fetchDocumentWithLimits(url) {
 
     const buffer = Buffer.concat(chunks);
     
+    // VALIDATION CRITIQUE : Vérifier le magic number PDF
+    if (!validatePDFMagicNumber(buffer)) {
+      console.error('[SECURITY] Tentative d\'upload d\'un fichier non-PDF détectée');
+      return {
+        success: false,
+        error: 'Le fichier n\'est pas un PDF valide. Seuls les vrais fichiers PDF sont acceptés.'
+      };
+    }
+    
+    console.log('[SECURITY] Magic number PDF validé avec succès');
+    
     return {
       success: true,
       buffer,
@@ -169,9 +193,8 @@ async function fetchDocumentWithLimits(url) {
  * Handler principal
  */
 exports.handler = async function(event, context) {
-  // Headers CORS sécurisés
   const headers = {
-    'Access-Control-Allow-Origin': '*', // En production, restreindre au domaine spécifique
+    'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'Content-Type',
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
     'X-Content-Type-Options': 'nosniff',
@@ -180,7 +203,6 @@ exports.handler = async function(event, context) {
     'Strict-Transport-Security': 'max-age=31536000; includeSubDomains'
   };
 
-  // Gérer les requêtes OPTIONS (preflight CORS)
   if (event.httpMethod === 'OPTIONS') {
     return {
       statusCode: 200,
@@ -189,7 +211,6 @@ exports.handler = async function(event, context) {
     };
   }
 
-  // Vérifier la méthode HTTP
   if (event.httpMethod !== 'POST') {
     return {
       statusCode: 405,
@@ -199,12 +220,10 @@ exports.handler = async function(event, context) {
   }
 
   try {
-    // Récupérer l'IP du client
     const clientIp = event.headers['x-forwarded-for'] || 
                      event.headers['client-ip'] || 
                      'unknown';
 
-    // Vérifier le rate limiting
     const rateLimitCheck = checkRateLimit(clientIp);
     if (!rateLimitCheck.allowed) {
       return {
@@ -214,7 +233,6 @@ exports.handler = async function(event, context) {
       };
     }
 
-    // Parser le body
     let body;
     try {
       body = JSON.parse(event.body || '{}');
@@ -228,7 +246,6 @@ exports.handler = async function(event, context) {
 
     const { url } = body;
 
-    // Vérifier la présence de l'URL
     if (!url) {
       return {
         statusCode: 400,
@@ -237,7 +254,6 @@ exports.handler = async function(event, context) {
       };
     }
 
-    // Valider l'URL
     const urlValidation = validateUrl(url);
     if (!urlValidation.valid) {
       return {
@@ -247,10 +263,8 @@ exports.handler = async function(event, context) {
       };
     }
 
-    // Log sécurisé (sans exposer l'URL complète)
-    console.log(`Requête depuis IP: ${clientIp}, Domaine: ${urlValidation.url.hostname}`);
+    console.log(`[INFO] Requête depuis IP: ${clientIp}, Domaine: ${urlValidation.url.hostname}`);
 
-    // Télécharger le document
     const downloadResult = await fetchDocumentWithLimits(url);
 
     if (!downloadResult.success) {
@@ -261,22 +275,20 @@ exports.handler = async function(event, context) {
       };
     }
 
-    // Retourner le PDF
     return {
       statusCode: 200,
       headers: {
         ...headers,
         'Content-Type': 'application/pdf',
         'Content-Disposition': 'inline; filename="document.pdf"',
-        'Cache-Control': 'private, max-age=3600' // Cache 1 heure
+        'Cache-Control': 'private, max-age=3600'
       },
       body: downloadResult.buffer.toString('base64'),
       isBase64Encoded: true
     };
 
   } catch (error) {
-    // Log l'erreur mais ne pas exposer les détails au client
-    console.error('Erreur serveur:', error);
+    console.error('[ERROR] Erreur serveur:', error);
     
     return {
       statusCode: 500,
