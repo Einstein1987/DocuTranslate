@@ -1,12 +1,36 @@
 // ============================================================
-// DOCUTRANSLATE.JS - VERSION OPTIMISÉE LIBRETRANSLATE
+// DOCUTRANSLATE.JS - VERSION CORRIGÉE ET OPTIMISÉE
 // ============================================================
-// Version simplifiée sans compteur ni historique
-// Avec : Cache, Barre de progression, Copier/Télécharger
+// Système de logging conditionnel
+// Code factorisé (Google Docs + PDF)
+// Compteur de quota MyMemory
+// Sélection langue source
+// Messages d'erreur améliorés
 // ============================================================
 
 // Configuration PDF.js
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.10.377/pdf.worker.min.js';
+
+// ============================================================
+// SYSTÈME DE LOGGING CONDITIONNEL
+// ============================================================
+
+const DEBUG_MODE = false; // Mettre à true pour activer les logs
+
+const Logger = {
+  log(...args) {
+    if (DEBUG_MODE) console.log(...args);
+  },
+  warn(...args) {
+    if (DEBUG_MODE) console.warn(...args);
+  },
+  error(...args) {
+    console.error(...args); // Les erreurs sont toujours affichées
+  },
+  info(...args) {
+    if (DEBUG_MODE) console.info(...args);
+  }
+};
 
 // ============================================================
 // CONFIGURATION
@@ -15,7 +39,103 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs
 const CONFIG = {
   TRANSLATION_ENDPOINT: '/.netlify/functions/translate-libre',
   CACHE_EXPIRY: 24 * 60 * 60 * 1000, // 24 heures
-  SPEECH_CHUNK_SIZE: 200
+  SPEECH_CHUNK_SIZE: 200,
+  DAILY_WORD_LIMIT: 10000, // Limite MyMemory
+  WARNING_THRESHOLD: 8000, // Seuil d'avertissement (80%)
+  CRITICAL_THRESHOLD: 9500 // Seuil critique (95%)
+};
+
+// ============================================================
+// GESTION DU QUOTA QUOTIDIEN
+// ============================================================
+
+const QuotaManager = {
+  _getTodayKey() {
+    const today = new Date();
+    return `quota_${today.getFullYear()}_${today.getMonth()}_${today.getDate()}`;
+  },
+
+  _getUsage() {
+    try {
+      const key = this._getTodayKey();
+      const data = localStorage.getItem(key);
+      return data ? parseInt(data) : 0;
+    } catch (error) {
+      Logger.error('Erreur lecture quota:', error);
+      return 0;
+    }
+  },
+
+  _setUsage(words) {
+    try {
+      const key = this._getTodayKey();
+      localStorage.setItem(key, words.toString());
+    } catch (error) {
+      Logger.error('Erreur écriture quota:', error);
+    }
+  },
+
+  getRemaining() {
+    const used = this._getUsage();
+    return Math.max(0, CONFIG.DAILY_WORD_LIMIT - used);
+  },
+
+  getUsed() {
+    return this._getUsage();
+  },
+
+  addUsage(words) {
+    const current = this._getUsage();
+    const newTotal = current + words;
+    this._setUsage(newTotal);
+    this.updateDisplay();
+    return newTotal;
+  },
+
+  canTranslate(estimatedWords) {
+    return this.getRemaining() >= estimatedWords;
+  },
+
+  updateDisplay() {
+    const quotaDisplay = document.getElementById('quotaDisplay');
+    const quotaText = document.getElementById('quotaText');
+    
+    if (!quotaDisplay || !quotaText) return;
+
+    const used = this.getUsed();
+    const remaining = this.getRemaining();
+    const percentage = (used / CONFIG.DAILY_WORD_LIMIT) * 100;
+
+    let color, icon, bgColor;
+    
+    if (percentage >= 95) {
+      color = '#c0392b';
+      bgColor = '#fadbd8';
+      icon = '🔴';
+    } else if (percentage >= 80) {
+      color = '#e67e22';
+      bgColor = '#fdebd0';
+      icon = '🟠';
+    } else if (percentage >= 50) {
+      color = '#f39c12';
+      bgColor = '#fcf3cf';
+      icon = '🟡';
+    } else {
+      color = '#27ae60';
+      bgColor = '#d5f4e6';
+      icon = '🟢';
+    }
+
+    quotaText.innerHTML = `${icon} <strong>${remaining.toLocaleString()}</strong> mots restants aujourd'hui`;
+    quotaDisplay.style.background = bgColor;
+    quotaDisplay.style.color = color;
+    quotaDisplay.style.border = `2px solid ${color}`;
+  },
+
+  reset() {
+    this._setUsage(0);
+    this.updateDisplay();
+  }
 };
 
 // ============================================================
@@ -23,36 +143,35 @@ const CONFIG = {
 // ============================================================
 
 const TranslationCache = {
-  _generateKey(docId, lang) {
-    return `docutranslate_${docId}_${lang}`;
+  _generateKey(docId, sourceLang, targetLang) {
+    return `docutranslate_${docId}_${sourceLang}_${targetLang}`;
   },
 
-  set(docId, lang, translation) {
+  set(docId, sourceLang, targetLang, translation) {
     try {
-      const key = this._generateKey(docId, lang);
+      const key = this._generateKey(docId, sourceLang, targetLang);
       const data = {
         translation,
         timestamp: Date.now()
       };
       localStorage.setItem(key, JSON.stringify(data));
     } catch (error) {
-      console.error('Erreur cache:', error);
+      Logger.error('Erreur cache:', error);
       if (error.name === 'QuotaExceededError') {
         this.clearOld();
       }
     }
   },
 
-  get(docId, lang) {
+  get(docId, sourceLang, targetLang) {
     try {
-      const key = this._generateKey(docId, lang);
+      const key = this._generateKey(docId, sourceLang, targetLang);
       const item = localStorage.getItem(key);
       
       if (!item) return null;
       
       const data = JSON.parse(item);
       
-      // Vérifier l'expiration
       if (Date.now() - data.timestamp > CONFIG.CACHE_EXPIRY) {
         localStorage.removeItem(key);
         return null;
@@ -80,7 +199,7 @@ const TranslationCache = {
         }
       });
     } catch (error) {
-      console.error('Erreur nettoyage cache:', error);
+      Logger.error('Erreur nettoyage cache:', error);
     }
   },
 
@@ -93,9 +212,9 @@ const TranslationCache = {
           cleared++;
         }
       });
-      showNotification(`Cache vidé (${cleared} traductions)`, 'success');
+      showNotification(`✅ Cache vidé (${cleared} traductions)`, 'success');
     } catch (error) {
-      console.error('Erreur vidage cache:', error);
+      Logger.error('Erreur vidage cache:', error);
     }
   }
 };
@@ -137,7 +256,7 @@ const AppState = {
 // ============================================================
 
 function showProgressBar() {
-  hideProgressBar(); // Supprimer l'ancienne si existe
+  hideProgressBar();
   
   const progressContainer = document.createElement('div');
   progressContainer.id = 'progressBarContainer';
@@ -239,7 +358,6 @@ async function extractTextFromPDF(pdfData) {
     const totalPages = pdfDoc.numPages;
     
     for (let i = 1; i <= totalPages; i++) {
-      // Mise à jour progression extraction
       const extractionPercent = 10 + (30 * i / totalPages);
       updateProgress(extractionPercent, '📖 Extraction du texte', `Page ${i}/${totalPages}`);
       
@@ -257,22 +375,89 @@ async function extractTextFromPDF(pdfData) {
     
     return text.trim();
   } catch (error) {
-    console.error('Erreur extraction PDF:', error);
-    throw new Error('Impossible d\'extraire le texte du PDF');
+    Logger.error('Erreur extraction PDF:', error);
+    throw new Error('Impossible d\'extraire le texte du PDF. Vérifiez que le fichier n\'est pas protégé ou corrompu.');
   }
 }
 
 // ============================================================
-// TRADUCTION
+// DÉTECTION DE LANGUE AMÉLIORÉE
 // ============================================================
 
-async function translateText(text, targetLanguage) {
+function detectSourceLanguage(text) {
+  const sample = text.substring(0, 1000).toLowerCase();
+  
+  const patterns = {
+    fr: {
+      words: ['le', 'la', 'les', 'de', 'et', 'est', 'dans', 'pour', 'que', 'qui', 'avec', 'sur', 'une', 'par', 'ce', 'pas', 'mais', 'ou', 'son', 'ses'],
+      chars: /[àâäçéèêëïîôùûüÿæœ]/g
+    },
+    en: {
+      words: ['the', 'and', 'is', 'in', 'to', 'of', 'that', 'it', 'for', 'on', 'with', 'as', 'was', 'at', 'be', 'this', 'have', 'from', 'or', 'by'],
+      chars: null
+    },
+    es: {
+      words: ['el', 'la', 'de', 'que', 'y', 'en', 'un', 'ser', 'se', 'no', 'por', 'con', 'para', 'una', 'su', 'como', 'del', 'los', 'al', 'más'],
+      chars: /[áéíóúñü¿¡]/g
+    },
+    de: {
+      words: ['der', 'die', 'und', 'in', 'den', 'von', 'zu', 'das', 'mit', 'sich', 'des', 'auf', 'für', 'ist', 'im', 'dem', 'nicht', 'ein', 'eine', 'als'],
+      chars: /[äöüß]/g
+    },
+    it: {
+      words: ['il', 'di', 'e', 'la', 'per', 'in', 'un', 'che', 'non', 'è', 'una', 'si', 'da', 'con', 'sono', 'al', 'come', 'le', 'nel', 'del'],
+      chars: /[àèéìíîòóùú]/g
+    },
+    pt: {
+      words: ['o', 'de', 'a', 'e', 'é', 'que', 'do', 'da', 'em', 'um', 'para', 'com', 'não', 'uma', 'os', 'no', 'se', 'na', 'por', 'mais'],
+      chars: /[ãáâàçéêíóôõú]/g
+    }
+  };
+  
+  const scores = {};
+  const words = sample.split(/\s+/);
+  
+  for (const [lang, config] of Object.entries(patterns)) {
+    let score = 0;
+    
+    // Score par mots communs
+    for (const word of words) {
+      const cleanWord = word.replace(/[^a-zàâäçéèêëïîôùûüÿæœáéíóúñüäöüßãâàêíóôõ]/g, '');
+      if (config.words.includes(cleanWord)) {
+        score += 2;
+      }
+    }
+    
+    // Score par caractères spéciaux
+    if (config.chars) {
+      const matches = sample.match(config.chars);
+      if (matches) {
+        score += matches.length;
+      }
+    }
+    
+    scores[lang] = score;
+  }
+  
+  Logger.log('Scores détection langue:', scores);
+  
+  const detected = Object.keys(scores).reduce((a, b) => scores[a] > scores[b] ? a : b);
+  Logger.log('Langue détectée:', detected);
+  
+  return detected;
+}
+
+// ============================================================
+// TRADUCTION (FONCTION PRINCIPALE)
+// ============================================================
+
+async function translateText(text, sourceLang, targetLang) {
   if (!text || text.trim() === '') {
     throw new Error('Aucun texte à traduire');
   }
   
   try {
-    updateProgress(50, '🌍 Traduction en cours', 'Connexion à l\'API...');
+    updateProgress(50, '🌍 Traduction en cours', 'Préparation de la requête...');
     
     const response = await fetch(CONFIG.TRANSLATION_ENDPOINT, {
       method: 'POST',
@@ -281,30 +466,39 @@ async function translateText(text, targetLanguage) {
       },
       body: JSON.stringify({
         text: text,
-        target_lang: targetLanguage,
+        source_lang: sourceLang,
+        target_lang: targetLang,
       }),
     });
     
     updateProgress(70, '🌍 Traduction en cours', 'Réception de la traduction...');
     
     if (!response.ok) {
-      if (response.status === 429) {
-        const data = await response.json();
-        throw new Error(data.error || 'Trop de requêtes. Veuillez patienter quelques minutes.');
+      let errorMessage = 'Erreur lors de la traduction';
+      
+      try {
+        const errorData = await response.json();
+        
+        if (response.status === 429) {
+          errorMessage = `⏱️ Limite de traduction atteinte (${CONFIG.DAILY_WORD_LIMIT.toLocaleString()} mots/jour).\n\nSolutions :\n• Réessayez demain\n• Réduisez la taille du document\n• Utilisez l'API DeepL (payante mais illimitée)`;
+        } else if (response.status === 400) {
+          errorMessage = `❌ Requête invalide : ${errorData.error || 'Vérifiez le format du document'}`;
+        } else if (response.status === 500) {
+          errorMessage = `⚙️ Erreur serveur temporaire.\n\nSolutions :\n• Réessayez dans quelques instants\n• Vérifiez votre connexion Internet\n• Si le problème persiste, contactez le support`;
+        } else {
+          errorMessage = `❌ Erreur ${response.status} : ${errorData.error || 'Erreur inconnue'}`;
+        }
+      } catch (e) {
+        errorMessage = `❌ Erreur réseau (code ${response.status}).\n\nVérifiez votre connexion Internet et réessayez.`;
       }
       
-      if (response.status === 400) {
-        const data = await response.json();
-        throw new Error(data.error || 'Erreur dans la requête');
-      }
-      
-      throw new Error(`Erreur serveur (${response.status})`);
+      throw new Error(errorMessage);
     }
     
     const data = await response.json();
     
     if (!data.translations || data.translations.length === 0) {
-      throw new Error('Aucune traduction reçue de l\'API');
+      throw new Error('❌ Aucune traduction reçue de l\'API.\n\nLe service de traduction est peut-être temporairement indisponible. Réessayez dans quelques minutes.');
     }
     
     updateProgress(90, '✨ Finalisation', 'Formatage du texte...');
@@ -314,44 +508,35 @@ async function translateText(text, targetLanguage) {
     // Améliorer le formatage
     translatedText = translatedText.replace(/([.?!])\s+/g, "$1\n\n");
     
+    // Estimer les mots traduits
+    const wordCount = text.split(/\s+/).length;
+    QuotaManager.addUsage(wordCount);
+    
+    Logger.log(`Traduit: ${wordCount} mots`);
+    
     return translatedText;
   } catch (error) {
-    console.error('Erreur traduction:', error);
+    Logger.error('Erreur traduction:', error);
     throw error;
   }
 }
 
 // ============================================================
-// TRADUCTION GOOGLE DOCS
+// FONCTION FACTORISÉE : TRADUCTION DE DOCUMENT
 // ============================================================
 
-async function translateGoogleDoc() {
+async function performDocumentTranslation(docType, docId, sourceLang, targetLang) {
   if (AppState.isTranslating) {
     showNotification('⚠️ Une traduction est déjà en cours', 'warning');
     return;
   }
   
-  const urlInput = document.getElementById('urlInput');
-  const url = urlInput.value.trim();
-  const targetLanguage = document.getElementById('languageSelect').value;
-  
-  if (!url) {
-    showNotification('⚠️ Veuillez entrer une URL Google Docs', 'error');
-    urlInput.focus();
-    return;
-  }
-  
-  // Extraire l'ID du document
-  const docIdMatch = url.match(/[-\w]{25,}/);
-  if (!docIdMatch) {
-    showNotification('⚠️ URL Google Docs invalide', 'error');
-    return;
-  }
-  
-  const docId = docIdMatch[0];
+  // Auto-détection si nécessaire
+  const sourceLanguage = sourceLang === 'auto' ? null : sourceLang;
   
   // Vérifier le cache
-  const cached = TranslationCache.get(docId, targetLanguage);
+  const cacheKey = sourceLanguage || 'auto';
+  const cached = TranslationCache.get(docId, cacheKey, targetLang);
   if (cached) {
     showNotification('⚡ Traduction chargée depuis le cache (instantané !)', 'success');
     const translatedTextContainer = document.getElementById('translatedText');
@@ -360,50 +545,104 @@ async function translateGoogleDoc() {
     return;
   }
   
-  const pdfUrl = `https://docs.google.com/document/d/${docId}/export?format=pdf`;
-  
   AppState.isTranslating = true;
   showProgressBar();
   updateProgress(0, '🚀 Démarrage', 'Initialisation...');
   
   try {
-    // Récupérer le PDF
-    updateProgress(5, '📄 Chargement du document', 'Connexion à Google Drive...');
+    let text, displayBlob;
     
-    const response = await fetch('/.netlify/functions/fetch-doc', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ url: pdfUrl })
-    });
-    
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || `Erreur lors du chargement (${response.status})`);
+    if (docType === 'gdoc') {
+      // Traitement Google Docs
+      const pdfUrl = `https://docs.google.com/document/d/${docId}/export?format=pdf`;
+      
+      updateProgress(5, '📄 Chargement du document', 'Connexion à Google Drive...');
+      
+      const response = await fetch('/.netlify/functions/fetch-doc', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ url: pdfUrl })
+      });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || `❌ Impossible de charger le document Google Docs.\n\nVérifiez que :\n• Le document est bien PUBLIC\n• L'URL est correcte\n• Vous avez une connexion Internet`);
+      }
+      
+      updateProgress(10, '📄 Chargement du document', 'Téléchargement en cours...');
+      
+      const blob = await response.blob();
+      displayBlob = URL.createObjectURL(blob);
+      
+      updateProgress(15, '📖 Extraction du texte', 'Analyse du document...');
+      
+      const pdfData = new Uint8Array(await blob.arrayBuffer());
+      text = await extractTextFromPDF(pdfData);
+      
+    } else if (docType === 'pdf') {
+      // Traitement PDF local
+      const fileInput = document.getElementById('pdfInput');
+      const file = fileInput.files[0];
+      
+      if (!file) {
+        throw new Error('❌ Aucun fichier sélectionné.\n\nVeuillez choisir un fichier PDF à traduire.');
+      }
+      
+      if (file.type !== 'application/pdf') {
+        throw new Error('❌ Le fichier doit être un PDF.\n\nFormat accepté : .pdf uniquement');
+      }
+      
+      if (file.size > 10 * 1024 * 1024) {
+        throw new Error('❌ Le fichier est trop volumineux (max 10 MB).\n\nSolutions :\n• Compressez le PDF\n• Divisez-le en plusieurs parties\n• Utilisez un fichier plus léger');
+      }
+      
+      updateProgress(10, '📄 Chargement du PDF', 'Lecture du fichier...');
+      
+      const arrayBuffer = await file.arrayBuffer();
+      const pdfData = new Uint8Array(arrayBuffer);
+      
+      displayBlob = URL.createObjectURL(new Blob([pdfData], { type: 'application/pdf' }));
+      
+      updateProgress(15, '📖 Extraction du texte', 'Analyse du document...');
+      
+      text = await extractTextFromPDF(pdfData);
     }
     
-    updateProgress(10, '📄 Chargement du document', 'Téléchargement en cours...');
+    Logger.log(`Texte extrait : ${text.length} caractères`);
     
-    const blob = await response.blob();
-    const urlBlob = URL.createObjectURL(blob);
+    if (!text || text.trim().length < 10) {
+      throw new Error('❌ Impossible d\'extraire du texte du document.\n\nCauses possibles :\n• Le PDF est une image scannée (utilisez un OCR)\n• Le document est vide\n• Le PDF est protégé ou corrompu');
+    }
     
-    // Afficher le PDF original
+    // Afficher le document original
     const documentViewer = document.getElementById('originalDocument');
-    documentViewer.src = urlBlob;
+    documentViewer.src = displayBlob;
     
-    // Extraire le texte
-    updateProgress(15, '📖 Extraction du texte', 'Analyse du document...');
+    // Vérifier le quota
+    const estimatedWords = text.split(/\s+/).length;
+    if (!QuotaManager.canTranslate(estimatedWords)) {
+      const remaining = QuotaManager.getRemaining();
+      throw new Error(`❌ Quota quotidien dépassé !\n\n📊 Mots restants : ${remaining.toLocaleString()}\n📝 Document à traduire : ~${estimatedWords.toLocaleString()} mots\n\nSolutions :\n• Réessayez demain (réinitialisation à minuit)\n• Traduisez un document plus court\n• Utilisez l'API DeepL (payante mais illimitée)`);
+    }
     
-    const pdfData = new Uint8Array(await blob.arrayBuffer());
-    const text = await extractTextFromPDF(pdfData);
+    if (QuotaManager.getRemaining() < CONFIG.WARNING_THRESHOLD) {
+      showNotification(`⚠️ Attention : Il vous reste seulement ${QuotaManager.getRemaining().toLocaleString()} mots aujourd'hui`, 'warning');
+    }
     
-    console.log(`📝 Texte extrait : ${text.length} caractères`);
+    // Détection automatique si nécessaire
+    let finalSourceLang = sourceLanguage;
+    if (!finalSourceLang) {
+      updateProgress(45, '🔍 Détection de la langue', 'Analyse du texte...');
+      finalSourceLang = detectSourceLanguage(text);
+      Logger.log(`Langue source détectée : ${finalSourceLang}`);
+    }
     
     // Traduire
-    updateProgress(45, '🌍 Traduction en cours', 'Envoi à LibreTranslate...');
+    updateProgress(50, '🌍 Traduction en cours', 'Connexion à MyMemory API...');
     
-    const translatedText = await translateText(text, targetLanguage);
+    const translatedText = await translateText(text, finalSourceLang, targetLang);
     
     // Afficher la traduction
     updateProgress(95, '✅ Traduction terminée', 'Affichage...');
@@ -413,7 +652,7 @@ async function translateGoogleDoc() {
     AppState.currentTranslation = translatedText;
     
     // Sauvegarder dans le cache
-    TranslationCache.set(docId, targetLanguage, translatedText);
+    TranslationCache.set(docId, finalSourceLang, targetLang, translatedText);
     
     updateProgress(100, '🎉 Terminé !', 'Succès');
     
@@ -423,128 +662,84 @@ async function translateGoogleDoc() {
     }, 500);
     
   } catch (error) {
-    console.error('Erreur:', error);
+    Logger.error('Erreur:', error);
     hideProgressBar();
-    showNotification(`❌ ${error.message}`, 'error');
+    
+    // Afficher l'erreur avec retours à la ligne préservés
+    const errorDiv = document.createElement('div');
+    errorDiv.style.cssText = 'white-space: pre-line; text-align: left; max-width: 600px; margin: 0 auto;';
+    errorDiv.textContent = error.message;
+    
+    const notification = document.createElement('div');
+    notification.style.cssText = `
+      position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+      padding: 25px 35px; background-color: #e74c3c; color: white;
+      border-radius: 12px; box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+      z-index: 10000; font-size: 16px; max-width: 90%;
+      animation: slideDown 0.3s ease-out;
+    `;
+    notification.appendChild(errorDiv);
+    
+    const closeBtn = document.createElement('button');
+    closeBtn.textContent = '✕ Fermer';
+    closeBtn.style.cssText = 'margin-top: 20px; padding: 10px 20px; background: white; color: #e74c3c; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; width: 100%;';
+    closeBtn.onclick = () => notification.remove();
+    notification.appendChild(closeBtn);
+    
+    document.body.appendChild(notification);
+    
+    setTimeout(() => notification.remove(), 15000);
+    
   } finally {
     AppState.isTranslating = false;
   }
 }
 
 // ============================================================
-// TRADUCTION PDF LOCAL
+// FONCTIONS PUBLIQUES DE TRADUCTION
 // ============================================================
 
-async function translatePDF() {
-  if (AppState.isTranslating) {
-    showNotification('⚠️ Une traduction est déjà en cours', 'warning');
+async function translateGoogleDoc() {
+  const urlInput = document.getElementById('urlInput');
+  const url = urlInput.value.trim();
+  const sourceLang = document.getElementById('sourceLanguageSelect').value;
+  const targetLang = document.getElementById('targetLanguageSelect').value;
+  
+  if (!url) {
+    showNotification('⚠️ Veuillez entrer une URL Google Docs', 'error');
+    urlInput.focus();
     return;
   }
   
+  const docIdMatch = url.match(/[-\w]{25,}/);
+  if (!docIdMatch) {
+    showNotification('⚠️ URL Google Docs invalide', 'error');
+    return;
+  }
+  
+  const docId = docIdMatch[0];
+  
+  await performDocumentTranslation('gdoc', docId, sourceLang, targetLang);
+}
+
+async function translatePDF() {
   const fileInput = document.getElementById('pdfInput');
   const file = fileInput.files[0];
-  const targetLanguage = document.getElementById('languageSelect').value;
+  const sourceLang = document.getElementById('sourceLanguageSelect').value;
+  const targetLang = document.getElementById('targetLanguageSelect').value;
   
   if (!file) {
     showNotification('⚠️ Veuillez sélectionner un fichier PDF', 'error');
     return;
   }
   
-  if (file.type !== 'application/pdf') {
-    showNotification('⚠️ Le fichier doit être un PDF', 'error');
-    return;
-  }
-  
-  if (file.size > 10 * 1024 * 1024) {
-    showNotification('⚠️ Le fichier est trop volumineux (max 10 MB)', 'error');
-    return;
-  }
-  
-  // ID unique pour le cache
   const docId = `pdf_${file.name}_${file.size}`;
   
-  // Vérifier le cache
-  const cached = TranslationCache.get(docId, targetLanguage);
-  if (cached) {
-    showNotification('⚡ Traduction chargée depuis le cache (instantané !)', 'success');
-    const translatedTextContainer = document.getElementById('translatedText');
-    translatedTextContainer.innerText = cached;
-    AppState.currentTranslation = cached;
-    return;
-  }
-  
-  AppState.isTranslating = true;
-  showProgressBar();
-  updateProgress(0, '🚀 Démarrage', 'Initialisation...');
-  
-  try {
-    const reader = new FileReader();
-    
-    reader.onload = async function() {
-      try {
-        updateProgress(10, '📄 Chargement du PDF', 'Lecture du fichier...');
-        
-        const pdfData = new Uint8Array(reader.result);
-        
-        // Afficher le PDF original
-        const documentViewer = document.getElementById('originalDocument');
-        documentViewer.src = URL.createObjectURL(new Blob([pdfData], { type: 'application/pdf' }));
-        
-        // Extraire le texte
-        updateProgress(15, '📖 Extraction du texte', 'Analyse du document...');
-        
-        const text = await extractTextFromPDF(pdfData);
-        
-        console.log(`📝 Texte extrait : ${text.length} caractères`);
-        
-        // Traduire
-        updateProgress(45, '🌍 Traduction en cours', 'Envoi à LibreTranslate...');
-        
-        const translatedText = await translateText(text, targetLanguage);
-        
-        // Afficher la traduction
-        updateProgress(95, '✅ Traduction terminée', 'Affichage...');
-        
-        const translatedTextContainer = document.getElementById('translatedText');
-        translatedTextContainer.innerText = translatedText;
-        AppState.currentTranslation = translatedText;
-        
-        // Sauvegarder dans le cache
-        TranslationCache.set(docId, targetLanguage, translatedText);
-        
-        updateProgress(100, '🎉 Terminé !', 'Succès');
-        
-        setTimeout(() => {
-          hideProgressBar();
-          showNotification('✅ Traduction terminée avec succès', 'success');
-        }, 500);
-        
-      } catch (error) {
-        console.error('Erreur:', error);
-        hideProgressBar();
-        showNotification(`❌ ${error.message}`, 'error');
-        AppState.isTranslating = false;
-      }
-    };
-    
-    reader.onerror = function() {
-      hideProgressBar();
-      showNotification('❌ Erreur lors de la lecture du fichier', 'error');
-      AppState.isTranslating = false;
-    };
-    
-    reader.readAsArrayBuffer(file);
-    
-  } catch (error) {
-    console.error('Erreur:', error);
-    hideProgressBar();
-    showNotification(`❌ ${error.message}`, 'error');
-    AppState.isTranslating = false;
-  }
+  await performDocumentTranslation('pdf', docId, sourceLang, targetLang);
 }
 
 // ============================================================
-// SYNTHÈSE VOCALE AMÉLIORÉE
+// SYNTHÈSE VOCALE
 // ============================================================
 
 function splitTextIntelligently(text, maxLength = CONFIG.SPEECH_CHUNK_SIZE) {
@@ -560,7 +755,6 @@ function splitTextIntelligently(text, maxLength = CONFIG.SPEECH_CHUNK_SIZE) {
       continue;
     }
     
-    // Découper par phrases
     const sentences = trimmedPara.match(/[^.!?]+[.!?]+/g) || [trimmedPara];
     let currentChunk = '';
     
@@ -573,7 +767,6 @@ function splitTextIntelligently(text, maxLength = CONFIG.SPEECH_CHUNK_SIZE) {
           currentChunk = '';
         }
         
-        // Découper la phrase longue
         const words = trimmedSentence.split(/\s+/);
         let wordChunk = '';
         
@@ -609,7 +802,7 @@ function splitTextIntelligently(text, maxLength = CONFIG.SPEECH_CHUNK_SIZE) {
 
 function speakNextChunk(voice, targetLanguage) {
   if (!AppState.speech.isReading || AppState.speech.currentIndex >= AppState.speech.chunks.length) {
-    console.log('🔊 Lecture terminée');
+    Logger.log('Lecture terminée');
     document.getElementById('translatedText').style.backgroundColor = 'transparent';
     AppState.resetSpeech();
     showNotification('✅ Lecture terminée', 'success');
@@ -630,7 +823,7 @@ function speakNextChunk(voice, targetLanguage) {
   };
   
   utterance.onerror = (event) => {
-    console.error(`Erreur synthèse (${AppState.speech.currentIndex + 1}/${AppState.speech.chunks.length}):`, event.error);
+    Logger.error(`Erreur synthèse (${AppState.speech.currentIndex + 1}/${AppState.speech.chunks.length}):`, event.error);
     
     if (event.error === 'interrupted' || event.error === 'synthesis-failed') {
       AppState.speech.currentIndex++;
@@ -645,7 +838,7 @@ function speakNextChunk(voice, targetLanguage) {
   try {
     speechSynthesis.speak(utterance);
   } catch (error) {
-    console.error('Erreur speak:', error);
+    Logger.error('Erreur speak:', error);
     document.getElementById('translatedText').style.backgroundColor = 'transparent';
     AppState.resetSpeech();
     showNotification('❌ Impossible de lire le texte', 'error');
@@ -660,7 +853,6 @@ function readTranslatedText() {
     return;
   }
   
-  // Si déjà en lecture, arrêter
   if (speechSynthesis.speaking || AppState.speech.isReading) {
     speechSynthesis.cancel();
     AppState.resetSpeech();
@@ -669,18 +861,18 @@ function readTranslatedText() {
     return;
   }
   
-  const targetLanguage = document.getElementById('languageSelect').value;
+  const targetLang = document.getElementById('targetLanguageSelect').value;
   
-  console.log(`🔊 Préparation lecture : ${text.length} caractères`);
+  Logger.log(`Préparation lecture : ${text.length} caractères`);
   
   AppState.speech.chunks = splitTextIntelligently(text);
-  console.log(`📑 ${AppState.speech.chunks.length} morceaux`);
+  Logger.log(`${AppState.speech.chunks.length} morceaux`);
   
   const voices = speechSynthesis.getVoices();
-  const voice = voices.find(v => v.lang.toLowerCase().startsWith(targetLanguage.toLowerCase()));
+  const voice = voices.find(v => v.lang.toLowerCase().startsWith(targetLang.toLowerCase()));
   
   if (voice) {
-    console.log('🎤 Voix:', voice.name);
+    Logger.log('Voix:', voice.name);
   }
   
   AppState.speech.isReading = true;
@@ -688,7 +880,7 @@ function readTranslatedText() {
   document.getElementById('translatedText').style.backgroundColor = '#e3f2fd';
   showNotification(`🔊 Lecture en cours (${AppState.speech.chunks.length} parties)`, 'info');
   
-  speakNextChunk(voice, targetLanguage);
+  speakNextChunk(voice, targetLang);
 }
 
 // ============================================================
@@ -706,7 +898,7 @@ function copyTranslation() {
   navigator.clipboard.writeText(text).then(() => {
     showNotification('✅ Texte copié dans le presse-papiers', 'success');
   }).catch(err => {
-    console.error('Erreur copie:', err);
+    Logger.error('Erreur copie:', err);
     showNotification('❌ Impossible de copier le texte', 'error');
   });
 }
@@ -737,16 +929,19 @@ function downloadTranslation() {
 // ============================================================
 
 document.addEventListener('DOMContentLoaded', () => {
-  console.log('🚀 DocuTranslate initialisé');
-  console.log('🌍 API : LibreTranslate (gratuit & illimité)');
+  Logger.log('DocuTranslate initialisé');
+  Logger.log('API : MyMemory (gratuite, 10 000 mots/jour)');
   
   // Nettoyer cache expiré
   TranslationCache.clearOld();
   
+  // Mettre à jour le quota
+  QuotaManager.updateDisplay();
+  
   // Charger voix
   speechSynthesis.onvoiceschanged = () => {
     const voices = speechSynthesis.getVoices();
-    console.log(`🎤 ${voices.length} voix disponibles`);
+    Logger.log(`${voices.length} voix disponibles`);
   };
   speechSynthesis.getVoices();
   
@@ -761,12 +956,21 @@ document.addEventListener('DOMContentLoaded', () => {
       from { transform: translate(-50%, 0); opacity: 1; }
       to { transform: translate(-50%, -100%); opacity: 0; }
     }
+    .quota-display {
+      padding: 12px 20px;
+      border-radius: 8px;
+      text-align: center;
+      font-size: 16px;
+      font-weight: 600;
+      margin: 15px 0;
+      transition: all 0.3s ease;
+    }
   `;
   document.head.appendChild(style);
   
   setTimeout(() => {
-    showNotification('👋 Bienvenue ! Traductions illimitées avec LibreTranslate', 'info');
-  }, 500);
+    showNotification('👋 Bienvenue ! API MyMemory : 10 000 mots/jour gratuits', 'info');
+  }, 1000);
 });
 
 // ============================================================
@@ -779,3 +983,4 @@ window.readTranslatedText = readTranslatedText;
 window.copyTranslation = copyTranslation;
 window.downloadTranslation = downloadTranslation;
 window.clearCache = () => TranslationCache.clearAll();
+window.resetQuota = () => QuotaManager.reset(); // Pour debug uniquement
