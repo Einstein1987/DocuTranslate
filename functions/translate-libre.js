@@ -1,7 +1,11 @@
 const fetch = require('node-fetch');
 
 // ============================================================
-// TRANSLATE-MYMEMORY.JS - VERSION CORRIGÉE
+// TRANSLATE-LIBRE.JS - VERSION CORRIGÉE
+// ============================================================
+// Messages d'erreur améliorés en français
+// Support langue source explicite
+// Meilleure gestion des erreurs
 // ============================================================
 
 const CONFIG = {
@@ -17,6 +21,7 @@ const CONFIG = {
     'IT': 'it',
     'PT-PT': 'pt',
     'PT-BR': 'pt',
+    'PT': 'pt',
     'RU': 'ru',
     'TR': 'tr'
   }
@@ -34,7 +39,7 @@ function checkRateLimit(ip) {
   if (count >= CONFIG.RATE_LIMIT_PER_IP_HOUR) {
     return { 
       allowed: false, 
-      error: `Limite horaire atteinte (${CONFIG.RATE_LIMIT_PER_IP_HOUR} traductions/heure)`
+      error: `Limite horaire atteinte (${CONFIG.RATE_LIMIT_PER_IP_HOUR} traductions/heure). Réessayez dans quelques minutes.`
     };
   }
   
@@ -52,48 +57,69 @@ function checkRateLimit(ip) {
 }
 
 /**
- * Détecte la langue source du texte de façon simple
+ * Détecte la langue source du texte de façon améliorée
  */
 function detectSourceLanguage(text) {
   const sample = text.substring(0, 500).toLowerCase();
   
-  // Mots français communs
-  const frenchWords = ['le', 'la', 'les', 'de', 'et', 'est', 'dans', 'pour', 'que', 'qui', 'avec', 'sur', 'une', 'par', 'ce', 'pas', 'mais', 'ou', 'son', 'ses'];
+  const patterns = {
+    fr: {
+      words: ['le', 'la', 'les', 'de', 'et', 'est', 'dans', 'pour', 'que', 'qui', 'avec', 'sur', 'une', 'par'],
+      chars: /[àâäçéèêëïîôùûüÿæœ]/g
+    },
+    en: {
+      words: ['the', 'and', 'is', 'in', 'to', 'of', 'that', 'it', 'for', 'on', 'with', 'as'],
+      chars: null
+    },
+    es: {
+      words: ['el', 'la', 'de', 'que', 'y', 'en', 'un', 'ser', 'se', 'no', 'por', 'con'],
+      chars: /[áéíóúñü¿¡]/g
+    },
+    de: {
+      words: ['der', 'die', 'und', 'in', 'den', 'von', 'zu', 'das', 'mit', 'sich'],
+      chars: /[äöüß]/g
+    },
+    it: {
+      words: ['il', 'di', 'e', 'la', 'per', 'in', 'un', 'che', 'non', 'è'],
+      chars: /[àèéìíîòóùú]/g
+    },
+    pt: {
+      words: ['o', 'de', 'a', 'e', 'é', 'que', 'do', 'da', 'em', 'um'],
+      chars: /[ãáâàçéêíóôõú]/g
+    }
+  };
   
-  // Mots anglais communs
-  const englishWords = ['the', 'and', 'is', 'in', 'to', 'of', 'that', 'it', 'for', 'on', 'with', 'as', 'was', 'at', 'be', 'this', 'have', 'from', 'or', 'by'];
-  
-  // Mots espagnols communs
-  const spanishWords = ['el', 'la', 'de', 'que', 'y', 'en', 'un', 'ser', 'se', 'no', 'por', 'con', 'para', 'una', 'su', 'como', 'del', 'los', 'al', 'más'];
-  
-  // Compter les correspondances
-  let frenchCount = 0;
-  let englishCount = 0;
-  let spanishCount = 0;
-  
+  const scores = {};
   const words = sample.split(/\s+/);
   
-  for (const word of words) {
-    const cleanWord = word.replace(/[^a-zàâäçéèêëïîôùûüÿæœ]/g, '');
-    if (frenchWords.includes(cleanWord)) frenchCount++;
-    if (englishWords.includes(cleanWord)) englishCount++;
-    if (spanishWords.includes(cleanWord)) spanishCount++;
+  for (const [lang, config] of Object.entries(patterns)) {
+    let score = 0;
+    
+    for (const word of words) {
+      const cleanWord = word.replace(/[^a-zàâäçéèêëïîôùûüÿæœáéíóúñüäöüßãâàêíóôõ]/g, '');
+      if (config.words.includes(cleanWord)) {
+        score += 2;
+      }
+    }
+    
+    if (config.chars) {
+      const matches = sample.match(config.chars);
+      if (matches) {
+        score += matches.length;
+      }
+    }
+    
+    scores[lang] = score;
   }
   
-  console.log(`[DETECT] FR:${frenchCount} EN:${englishCount} ES:${spanishCount}`);
+  const detected = Object.keys(scores).reduce((a, b) => scores[a] > scores[b] ? a : b);
+  console.log(`[DETECT] Langue détectée: ${detected}`, scores);
   
-  // Retourner la langue avec le plus de correspondances
-  if (frenchCount >= englishCount && frenchCount >= spanishCount) {
-    return 'fr';
-  } else if (englishCount >= spanishCount) {
-    return 'en';
-  } else {
-    return 'es';
-  }
+  return detected;
 }
 
 /**
- * Découpe le texte en morceaux de max 450 caractères (marge de sécurité)
+ * Découpe le texte en morceaux de max 450 caractères
  */
 function splitText(text, maxLength = 450) {
   if (text.length <= maxLength) {
@@ -101,11 +127,8 @@ function splitText(text, maxLength = 450) {
   }
   
   const chunks = [];
-  
-  // Découper par phrases
   const sentences = text.match(/[^.!?]+[.!?]+/g) || [];
   
-  // Si pas de phrases détectées, découper par mots
   if (sentences.length === 0) {
     const words = text.split(/\s+/);
     let currentChunk = '';
@@ -126,13 +149,11 @@ function splitText(text, maxLength = 450) {
     return chunks;
   }
   
-  // Regrouper les phrases
   let currentChunk = '';
   
   for (const sentence of sentences) {
     const trimmedSentence = sentence.trim();
     
-    // Si une seule phrase est trop longue, la découper par mots
     if (trimmedSentence.length > maxLength) {
       if (currentChunk.trim()) {
         chunks.push(currentChunk.trim());
@@ -155,7 +176,6 @@ function splitText(text, maxLength = 450) {
         chunks.push(wordChunk.trim());
       }
     } else {
-      // Ajouter la phrase au chunk actuel si ça rentre
       if ((currentChunk + ' ' + trimmedSentence).length > maxLength && currentChunk) {
         chunks.push(currentChunk.trim());
         currentChunk = trimmedSentence;
@@ -175,19 +195,23 @@ function splitText(text, maxLength = 450) {
 /**
  * Traduit avec MyMemory API
  */
-async function translateWithMyMemory(text, targetLang) {
-  const targetLanguageCode = CONFIG.LANGUAGE_MAP[targetLang] || targetLang;
+async function translateWithMyMemory(text, sourceLang, targetLang) {
+  const targetLanguageCode = CONFIG.LANGUAGE_MAP[targetLang] || targetLang.toLowerCase();
   
-  // Détecter la langue source
-  const sourceLanguageCode = detectSourceLanguage(text);
+  // Utiliser la langue source fournie ou détecter
+  let sourceLanguageCode;
+  if (sourceLang) {
+    sourceLanguageCode = CONFIG.LANGUAGE_MAP[sourceLang] || sourceLang.toLowerCase();
+  } else {
+    sourceLanguageCode = detectSourceLanguage(text);
+  }
   
   console.log(`[MyMemory] Traduction: ${text.length} chars`);
   console.log(`[MyMemory] ${sourceLanguageCode} → ${targetLanguageCode}`);
   
   try {
-    // Découper le texte
     const chunks = splitText(text, 450);
-    console.log(`[MyMemory] ${chunks.length} morceaux`);
+    console.log(`[MyMemory] ${chunks.length} morceaux à traduire`);
     
     const translations = [];
     
@@ -198,7 +222,6 @@ async function translateWithMyMemory(text, targetLang) {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), CONFIG.REQUEST_TIMEOUT);
 
-      // Construire l'URL avec langpair correct
       const params = new URLSearchParams({
         q: chunk,
         langpair: `${sourceLanguageCode}|${targetLanguageCode}`
@@ -213,20 +236,24 @@ async function translateWithMyMemory(text, targetLang) {
 
       if (!response.ok) {
         console.error(`[MyMemory] HTTP ${response.status}`);
-        throw new Error(`MyMemory API erreur ${response.status}`);
+        throw new Error(`Erreur API MyMemory (${response.status})`);
       }
 
       const data = await response.json();
       
-      // Vérifier si c'est une erreur
       if (data.responseStatus !== 200) {
-        console.error(`[MyMemory] Erreur:`, data);
-        throw new Error(`MyMemory erreur: ${data.responseDetails || 'Erreur inconnue'}`);
+        console.error(`[MyMemory] Erreur API:`, data);
+        
+        if (data.responseStatus === 429 || (data.responseDetails && data.responseDetails.includes('LIMIT'))) {
+          throw new Error('QUOTA_EXCEEDED');
+        }
+        
+        throw new Error(data.responseDetails || 'Erreur de traduction');
       }
       
       if (!data.responseData || !data.responseData.translatedText) {
         console.error(`[MyMemory] Pas de traduction:`, data);
-        throw new Error('Pas de traduction dans la réponse');
+        throw new Error('Traduction vide reçue');
       }
       
       const translated = data.responseData.translatedText;
@@ -234,7 +261,7 @@ async function translateWithMyMemory(text, targetLang) {
       
       translations.push(translated);
       
-      // Délai entre les requêtes
+      // Délai entre requêtes
       if (i < chunks.length - 1) {
         await new Promise(resolve => setTimeout(resolve, 500));
       }
@@ -257,15 +284,14 @@ async function translateWithMyMemory(text, targetLang) {
 }
 
 exports.handler = async function(event, context) {
-  console.log('[HANDLER] Requête');
+  console.log('[HANDLER] Nouvelle requête de traduction');
   
   const headers = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'Content-Type',
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
     'Content-Type': 'application/json',
-    'X-Content-Type-Options': 'nosniff',
-    'X-Powered-By': 'MyMemory'
+    'X-Content-Type-Options': 'nosniff'
   };
 
   if (event.httpMethod === 'OPTIONS') {
@@ -276,7 +302,7 @@ exports.handler = async function(event, context) {
     return {
       statusCode: 405,
       headers,
-      body: JSON.stringify({ error: 'Méthode non autorisée' })
+      body: JSON.stringify({ error: 'Méthode non autorisée. Utilisez POST.' })
     };
   }
 
@@ -306,17 +332,17 @@ exports.handler = async function(event, context) {
       return {
         statusCode: 400,
         headers,
-        body: JSON.stringify({ error: 'JSON invalide' })
+        body: JSON.stringify({ error: 'Corps de requête JSON invalide' })
       };
     }
 
-    const { text, target_lang } = body;
+    const { text, source_lang, target_lang } = body;
 
     if (!text || typeof text !== 'string' || text.trim().length === 0) {
       return {
         statusCode: 400,
         headers,
-        body: JSON.stringify({ error: 'Texte manquant' })
+        body: JSON.stringify({ error: 'Le texte à traduire est manquant ou vide' })
       };
     }
 
@@ -327,7 +353,7 @@ exports.handler = async function(event, context) {
         statusCode: 400,
         headers,
         body: JSON.stringify({ 
-          error: `Texte trop long (max ${CONFIG.MAX_TEXT_LENGTH} chars)`
+          error: `Texte trop long. Maximum ${CONFIG.MAX_TEXT_LENGTH} caractères (${trimmedText.length} fournis)`
         })
       };
     }
@@ -337,12 +363,13 @@ exports.handler = async function(event, context) {
         statusCode: 400,
         headers,
         body: JSON.stringify({ 
-          error: `Langue non supportée: ${Object.keys(CONFIG.LANGUAGE_MAP).join(', ')}`
+          error: `Langue cible invalide. Langues supportées: ${Object.keys(CONFIG.LANGUAGE_MAP).join(', ')}`
         })
       };
     }
 
-    const result = await translateWithMyMemory(trimmedText, target_lang);
+    // La langue source est optionnelle (sera détectée automatiquement si non fournie)
+    const result = await translateWithMyMemory(trimmedText, source_lang, target_lang);
 
     return {
       statusCode: 200,
@@ -359,7 +386,17 @@ exports.handler = async function(event, context) {
         statusCode: 504,
         headers,
         body: JSON.stringify({ 
-          error: 'Timeout. Réessayez.'
+          error: 'Délai d\'attente dépassé. Le serveur de traduction met trop de temps à répondre. Réessayez.'
+        })
+      };
+    }
+    
+    if (error.message === 'QUOTA_EXCEEDED') {
+      return {
+        statusCode: 429,
+        headers,
+        body: JSON.stringify({ 
+          error: 'Quota quotidien de traduction atteint (10 000 mots/jour). Réessayez demain.'
         })
       };
     }
@@ -368,7 +405,7 @@ exports.handler = async function(event, context) {
       statusCode: 500,
       headers,
       body: JSON.stringify({ 
-        error: 'Erreur: ' + error.message
+        error: `Erreur de traduction: ${error.message || 'Erreur inconnue'}`
       })
     };
   }
