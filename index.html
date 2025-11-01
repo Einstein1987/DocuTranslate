@@ -25,6 +25,11 @@
       
       <p class="subtitle">Traduction de documents Google Docs</p>
       
+      <!-- Compteur de quota -->
+      <div id="quotaDisplay" class="quota-display">
+        <span id="quotaText">📊 Chargement du quota...</span>
+      </div>
+      
       <!-- Saisie URL -->
       <div class="input-group">
         <input 
@@ -35,9 +40,21 @@
         >
       </div>
       
-      <!-- Sélection langue et traduction -->
+      <!-- Sélection langues et traduction -->
       <div class="translate-section">
-        <select id="languageSelect" aria-label="Langue cible">
+        <select id="sourceLanguageSelect" aria-label="Langue source" title="Langue du document original">
+          <option value="auto">🔄 Auto</option>
+          <option value="DE">🇩🇪 Allemand</option>
+          <option value="EN">🇬🇧 Anglais</option>
+          <option value="ES">🇪🇸 Espagnol</option>
+          <option value="FR">🇫🇷 Français</option>
+          <option value="IT">🇮🇹 Italien</option>
+          <option value="PT">🇵🇹 Portugais</option>
+          <option value="RU">🇷🇺 Russe</option>
+          <option value="TR">🇹🇷 Turc</option>
+        </select>
+        <span style="font-size: 24px; padding: 0 5px;">→</span>
+        <select id="targetLanguageSelect" aria-label="Langue cible" title="Langue de traduction souhaitée">
           <option value="DE">🇩🇪 Allemand</option>
           <option value="EN">🇬🇧 Anglais</option>
           <option value="ES">🇪🇸 Espagnol</option>
@@ -48,10 +65,11 @@
           <option value="RU">🇷🇺 Russe</option>
           <option value="TR">🇹🇷 Turc</option>
         </select>
-        <button onclick="translateDocument()" class="translate-btn">
-          🌍 Traduire
-        </button>
       </div>
+      
+      <button onclick="translateDocument()" class="translate-btn">
+        🌍 Traduire
+      </button>
       
       <!-- Aperçu du document original -->
       <div class="document-container">
@@ -82,30 +100,34 @@
       </div>
       
       <!-- Boutons d'action -->
-<div class="centre" style="display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-top: 15px;">
-  <button onclick="readTranslatedText()" class="voice-btn" style="flex: 1; min-width: 200px;">
-    🔊 Écouter
-  </button>
-  <button onclick="copyTranslation()" class="voice-btn" style="flex: 1; min-width: 200px; background: linear-gradient(135deg, #9b59b6, #8e44ad);">
-    📋 Copier
-  </button>
-  <button onclick="downloadTranslation()" class="voice-btn" style="flex: 1; min-width: 200px; background: linear-gradient(135deg, #16a085, #138d75);">
-    💾 Télécharger
-  </button>
-</div>
+      <div class="centre" style="display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-top: 15px;">
+        <button onclick="readTranslatedText()" class="voice-btn" style="flex: 1; min-width: 200px;">
+          🔊 Écouter
+        </button>
+        <button onclick="copyTranslation()" class="voice-btn" style="flex: 1; min-width: 200px; background: linear-gradient(135deg, #9b59b6, #8e44ad);">
+          📋 Copier
+        </button>
+        <button onclick="downloadTranslation()" class="voice-btn" style="flex: 1; min-width: 200px; background: linear-gradient(135deg, #16a085, #138d75);">
+          💾 Télécharger
+        </button>
+      </div>
       
       <!-- Informations -->
       <div class="info-box">
-  <p><strong>💡 Astuces :</strong></p>
-  <ul>
-    <li>📄 Le document doit être <strong>public</strong></li>
-    <li>🔊 Écoutez avec la synthèse vocale</li>
-    <li>⚡ Cache : rechargement instantané</li>
-  </ul>
-  <p style="margin-top: 10px; padding: 8px; background: #d5f4e6; border-radius: 5px; color: #27ae60; font-weight: bold; text-align: center;">
-    🎉 10,000 mots/jour gratuits avec MyMemory
-  </p>
-</div>
+        <p><strong>💡 Astuces :</strong></p>
+        <ul>
+          <li>📄 Le document doit être <strong>public</strong></li>
+          <li>🔊 Écoutez avec la synthèse vocale</li>
+          <li>⚡ Cache : rechargement instantané</li>
+          <li>🌍 Sélectionnez la langue source pour plus de précision</li>
+        </ul>
+        <p style="margin-top: 10px; padding: 8px; background: #fff3cd; border-radius: 5px; color: #856404; font-weight: bold; text-align: center; border: 1px solid #ffeaa7;">
+          ⚠️ API MyMemory : Limite de 10 000 mots/jour
+        </p>
+        <p style="margin-top: 5px; font-size: 12px; color: #666; text-align: center;">
+          Pour un usage intensif professionnel, utilisez l'API DeepL (payante mais illimitée)
+        </p>
+      </div>
     </div>
   </div>
 
