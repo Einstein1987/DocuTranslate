@@ -95,7 +95,7 @@ body {
   min-width: 0; /* IMPORTANT: permet au flex item de rétrécir en dessous de sa taille de contenu */
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 10px;
 }
 
 .right-pane {
@@ -168,7 +168,7 @@ h3 {
   text-align: center;
   color: #7f8c8d;
   font-size: 1.1em;
-  margin: 0 0 20px 0;
+  margin: 0 0 10px 0;
 }
 
 /* ============================================================
@@ -650,3 +650,11 @@ body.keyboard-navigation *:focus {
     font-size: 13px;
   }
 }
+#reset-section {
+  margin-top: 5px !important;
+  margin-bottom: 10px;
+}
+
+
+
+
