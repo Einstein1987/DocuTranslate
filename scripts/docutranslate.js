@@ -1022,6 +1022,24 @@ window.addEventListener('load', () => {
     controls.insertBefore(feedbackDiv, controls.firstChild);
   }
 });
+document.getElementById('pdfInput').addEventListener('change', function(event) {
+          const file = event.target.files[0];
+          if (!file) return;
+        
+          const nameDisplay = document.getElementById('fileNameDisplay');
+          if (nameDisplay) {
+            nameDisplay.innerHTML = `<span style="color: #27ae60;">✅ Fichier prêt : ${file.name}</span>`;
+            nameDisplay.style.display = 'block';
+          }
+        });
+  
+          // Activer le mode focus
+          const setupSection = document.getElementById('setup-section');
+          if (setupSection) setupSection.style.display = 'none';
+  
+          // Lancer la traduction PDF
+          translatePDF(); 
+      });
 // ============================================================
 // FONCTIONS GLOBALES
 // ============================================================
