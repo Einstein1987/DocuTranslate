@@ -9,13 +9,6 @@
 </head>
 <body>
   <div class="container">
-    <!-- Bouton de navigation -->
-    <div class="top-right">
-      <button id="loadPdfButton" onclick="window.location.href='pdf.html'" title="Traduire un PDF">
-        📄 PDF
-      </button>
-    </div>
-
     <!-- Panneau gauche - Document original -->
     <div class="left-pane">
       <h1 class="app-title">
@@ -29,17 +22,26 @@
       <div id="quotaDisplay" class="quota-display">
         <span id="quotaText">📊 Chargement du quota...</span>
       </div>
-      
-      <!-- Saisie URL -->
-      <div class="input-group">
-        <input 
-          type="text" 
-          id="urlInput" 
-          placeholder="URL du document Google Docs"
-          aria-label="URL du document Google Docs"
-        >
-      </div>
-      
+      <div id="setup-section" class="centre">
+        <div style="background: #f8f9fa; padding: 15px; border-radius: 10px; margin-bottom: 20px;">
+            <p style="margin-top: 0;"><strong>Option A :</strong> Lien Google Docs</p>
+            <input type="text" id="urlInput" placeholder="Collez l'URL ici..." aria-label="URL du document">
+            <button id="loadDocumentButton" onclick="loadDocument()">
+                🌍 Traduire le document en ligne
+            </button>
+        </div>
+        <div style="margin: 20px 0; border-bottom: 2px dashed #bdc3c7; position: relative;">
+            <span style="position: absolute; top: -10px; left: 50%; transform: translateX(-50%); background: white; padding: 0 10px; color: #7f8c8d; font-weight: bold;">OU</span>
+        </div>
+        <div style="background: #f8f9fa; padding: 15px; border-radius: 10px; margin-top: 20px;">
+            <p style="margin-top: 0;"><strong>Option B :</strong> Fichier de la tablette/PC</p>
+            <label class="file-label" for="fileInput">
+                📁 Choisir un fichier PDF
+            </label>
+            <input type="file" id="fileInput" accept="application/pdf" style="display: none;" aria-label="Choisir un fichier PDF">
+            <div id="fileNameDisplay" class="file-name"></div>
+        </div>
+    </div>
       <!-- Sélection langues et traduction -->
       <div class="translate-section">
         <select id="sourceLanguageSelect" aria-label="Langue source" title="Langue du document original">
@@ -135,3 +137,8 @@
   <script src="scripts/docutranslate.js"></script>
 </body>
 </html>
+
+
+
+
+
