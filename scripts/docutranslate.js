@@ -723,19 +723,14 @@ async function translateGoogleDoc() {
 }
 
 async function translatePDF() {
-  const fileInput = document.getElementById('pdfInput');
-  const file = fileInput.files[0];
-  const sourceLang = document.getElementById('sourceLanguageSelect').value;
-  const targetLang = document.getElementById('targetLanguageSelect').value;
-  
-  if (!file) {
-    showNotification('⚠️ Veuillez sélectionner un fichier PDF', 'error');
-    return;
-  }
-  
-  const docId = `pdf_${file.name}_${file.size}`;
-  
-  await performDocumentTranslation('pdf', docId, sourceLang, targetLang);
+    const fileInput = document.getElementById('pdfInput');
+    const file = fileInput.files[0];
+    
+    if (!file) {
+        showNotification('❌ Aucun fichier sélectionné', 'error');
+        return;
+    }
+    await performDocumentTranslation('pdf', `pdf_${file.name}`, 'auto', document.getElementById('targetLanguageSelect').value);
 }
 
 // ============================================================
