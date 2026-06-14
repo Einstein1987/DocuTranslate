@@ -525,6 +525,19 @@ async function translateText(text, sourceLang, targetLang) {
 // FONCTION FACTORISÉE : TRADUCTION DE DOCUMENT
 // ============================================================
 
+// Fonction pivot pour gérer le clic sur "Traduire"
+async function handleTranslationClick() {
+    const urlInput = document.getElementById('urlInput').value.trim();
+    const fileInput = document.getElementById('pdfInput');
+
+    if (urlInput) {
+        await translateDocument(); // Ta fonction GDoc existante
+    } else if (fileInput.files.length > 0) {
+        await translatePDF(); // Ta fonction PDF existante
+    } else {
+        showNotification('⚠️ Veuillez fournir une URL ou choisir un fichier', 'warning');
+    }
+}
 async function performDocumentTranslation(docType, docId, sourceLang, targetLang) {
   if (AppState.isTranslating) {
     showNotification('⚠️ Une traduction est déjà en cours', 'warning');
@@ -690,9 +703,18 @@ async function performDocumentTranslation(docType, docId, sourceLang, targetLang
     
     setTimeout(() => notification.remove(), 15000);
     
-  } finally {
+  } 
+  finally {
     AppState.isTranslating = false;
   }
+  // Masquer la zone de configuration
+    const setupSection = document.getElementById('setup-section');
+    if (setupSection) setupSection.style.display = 'none';
+
+    //Dynamiser le titre
+    const targetLangSelect = document.getElementById('targetLanguageSelect');
+    const langName = targetLangSelect.options[targetLangSelect.selectedIndex].text;
+    document.querySelector('.right-pane h3').textContent = `📝 Traduction en ${langName}`;
 }
 
 // ============================================================
