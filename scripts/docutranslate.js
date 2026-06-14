@@ -1004,12 +1004,34 @@ document.addEventListener('DOMContentLoaded', () => {
   }, 1000);
 });
 // ============================================================
-// GESTION DE L'AFFICHAGE DU NOM DU FICHIER PDF
+// GESTION DE L'AFFICHAGE DU NOM DU FICHIER URl et PDF
 // ============================================================
-// On attend que la page soit chargée pour lier l'événement
+// ============================================================
+// INITIALISATION DE L'INTERFACE (URL & PDF)
+// ============================================================
 document.addEventListener('DOMContentLoaded', () => {
-  const pdfInput = document.getElementById('pdfInput');
   
+  // 1. Gestion du lien automatique (Paramètre URL)
+  const urlParams = new URLSearchParams(window.location.search);
+  const docUrl = urlParams.get('doc');
+  
+  if (docUrl) {
+    document.getElementById('urlInput').value = docUrl;
+    document.getElementById('setup-section').style.display = 'none';
+    
+    // Ajout du feedback visuel
+    const controls = document.getElementById('translation-controls');
+    if (controls && !document.getElementById('url-feedback')) {
+      const feedbackDiv = document.createElement('div');
+      feedbackDiv.id = 'url-feedback';
+      feedbackDiv.style.cssText = 'width: 100%; text-align: center; margin-bottom: 10px; color: #27ae60; font-weight: bold; background: #e8f8f5; padding: 10px; border-radius: 8px;';
+      feedbackDiv.innerHTML = '✅ Document détecté. Choisissez la langue de destination.';
+      controls.insertBefore(feedbackDiv, controls.firstChild);
+    }
+  }
+
+  // 2. Gestion de l'affichage du nom du fichier PDF
+  const pdfInput = document.getElementById('pdfInput');
   if (pdfInput) {
     pdfInput.addEventListener('change', function(event) {
       const file = event.target.files[0];
@@ -1017,21 +1039,17 @@ document.addEventListener('DOMContentLoaded', () => {
       
       const nameDisplay = document.getElementById('fileNameDisplay');
       if (nameDisplay) {
-        // On affiche juste le nom pour confirmer la réception
         nameDisplay.innerHTML = `<span style="color: #27ae60;">✅ Fichier prêt : ${file.name}</span>`;
         nameDisplay.style.display = 'block';
       }
-      
-      // /!\ On ne cache RIEN ici et on ne lance pas translatePDF() !
-      // On attend que l'utilisateur choisisse sa langue et clique sur "Traduire"
     });
   }
 });
 
 // ============================================================
-// FONCTIONS GLOBALES
+// FONCTIONS GLOBALES (Ne pas modifier)
 // ============================================================
-window.handleTranslationClick = handleTranslationClick; // Rendre la fonction pivot accessible
+window.handleTranslationClick = handleTranslationClick;
 window.translateDocument = translateGoogleDoc;
 window.translatePDF = translatePDF;
 window.readTranslatedText = readTranslatedText;
