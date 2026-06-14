@@ -623,12 +623,24 @@ async function performDocumentTranslation(docType, docId, sourceLang, targetLang
       text = await extractTextFromPDF(pdfData);
     }
     
+    
     Logger.log(`Texte extrait : ${text.length} caractères`);
     
     if (!text || text.trim().length < 10) {
       throw new Error('❌ Impossible d\'extraire du texte du document.\n\nCauses possibles :\n• Le PDF est une image scannée (utilisez un OCR)\n• Le document est vide\n• Le PDF est protégé ou corrompu');
     }
-    
+    // Nettoyage de l'interface ---
+    document.getElementById('setup-section').style.display = 'none';
+    document.getElementById('translation-controls').style.display = 'none';
+        
+    // Afficher le bouton reset
+    const resetSection = document.getElementById('reset-section');
+    if (resetSection) resetSection.style.display = 'block';
+
+    // Dynamiser le titre de la traduction
+    const targetLangSelect = document.getElementById('targetLanguageSelect');
+    const langName = targetLangSelect.options[targetLangSelect.selectedIndex].text;
+    document.querySelector('.right-pane h3').textContent = `📝 Traduction en ${langName}`;
     // Afficher le document original
     const documentViewer = document.getElementById('originalDocument');
     documentViewer.src = displayBlob;
@@ -996,7 +1008,8 @@ window.addEventListener('load', () => {
   
   if (docUrl) {
     document.getElementById('urlInput').value = docUrl;
-    loadDocument(); // Lance le processus de traduction automatiquement
+    // On cache uniquement le setup URL/PDF, mais on garde les contrôles de langue
+    document.getElementById('setup-section').style.display = 'none';
   }
 });
 // ============================================================
