@@ -972,7 +972,16 @@ document.addEventListener('DOMContentLoaded', () => {
     showNotification('👋 Bienvenue ! API MyMemory : 10 000 mots/jour gratuits', 'info');
   }, 1000);
 });
-
+window.addEventListener('load', () => {
+  // Détection du paramètre URL (le lien de la capsule)
+  const urlParams = new URLSearchParams(window.location.search);
+  const docUrl = urlParams.get('doc');
+  
+  if (docUrl) {
+    document.getElementById('urlInput').value = docUrl;
+    loadDocument(); // Lance le processus de traduction automatiquement
+  }
+});
 // ============================================================
 // FONCTIONS GLOBALES
 // ============================================================
