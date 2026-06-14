@@ -1003,51 +1003,39 @@ document.addEventListener('DOMContentLoaded', () => {
     showNotification('👋 Bienvenue ! API MyMemory : 10 000 mots/jour gratuits', 'info');
   }, 1000);
 });
-window.addEventListener('load', () => {
-  // Détection du paramètre URL (le lien de la capsule)
-  const urlParams = new URLSearchParams(window.location.search);
-  const docUrl = urlParams.get('doc');
+// ============================================================
+// GESTION DE L'AFFICHAGE DU NOM DU FICHIER PDF
+// ============================================================
+// On attend que la page soit chargée pour lier l'événement
+document.addEventListener('DOMContentLoaded', () => {
+  const pdfInput = document.getElementById('pdfInput');
   
-  if (docUrl) {
-    document.getElementById('urlInput').value = docUrl;
-    // On cache uniquement le setup URL/PDF, mais on garde les contrôles de langue
-    document.getElementById('setup-section').style.display = 'none';
-    // Afficher un feedback de chargement
-    const controls = document.getElementById('translation-controls');
-    const feedbackDiv = document.createElement('div');
-    feedbackDiv.id = 'url-feedback';
-    feedbackDiv.style.cssText = 'width: 100%; text-align: center; margin-bottom: 10px; color: #27ae60; font-weight: bold; background: #e8f8f5; padding: 10px; border-radius: 8px;';
-    feedbackDiv.innerHTML = '✅ Document détecté. Choisissez la langue de destination.';
-    // Insérer le feedback juste avant les sélecteurs de langue
-    controls.insertBefore(feedbackDiv, controls.firstChild);
+  if (pdfInput) {
+    pdfInput.addEventListener('change', function(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      
+      const nameDisplay = document.getElementById('fileNameDisplay');
+      if (nameDisplay) {
+        // On affiche juste le nom pour confirmer la réception
+        nameDisplay.innerHTML = `<span style="color: #27ae60;">✅ Fichier prêt : ${file.name}</span>`;
+        nameDisplay.style.display = 'block';
+      }
+      
+      // /!\ On ne cache RIEN ici et on ne lance pas translatePDF() !
+      // On attend que l'utilisateur choisisse sa langue et clique sur "Traduire"
+    });
   }
 });
-document.getElementById('pdfInput').addEventListener('change', function(event) {
-          const file = event.target.files[0];
-          if (!file) return;
-        
-          const nameDisplay = document.getElementById('fileNameDisplay');
-          if (nameDisplay) {
-            nameDisplay.innerHTML = `<span style="color: #27ae60;">✅ Fichier prêt : ${file.name}</span>`;
-            nameDisplay.style.display = 'block';
-          }
-        });
-  
-          // Activer le mode focus
-          const setupSection = document.getElementById('setup-section');
-          if (setupSection) setupSection.style.display = 'none';
-  
-          // Lancer la traduction PDF
-          translatePDF(); 
-      });
+
 // ============================================================
 // FONCTIONS GLOBALES
 // ============================================================
-
+window.handleTranslationClick = handleTranslationClick; // Rendre la fonction pivot accessible
 window.translateDocument = translateGoogleDoc;
 window.translatePDF = translatePDF;
 window.readTranslatedText = readTranslatedText;
 window.copyTranslation = copyTranslation;
 window.downloadTranslation = downloadTranslation;
 window.clearCache = () => TranslationCache.clearAll();
-window.resetQuota = () => QuotaManager.reset(); // Pour debug uniquement
+window.resetQuota = () => QuotaManager.reset();
