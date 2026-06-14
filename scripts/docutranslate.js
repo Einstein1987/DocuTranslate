@@ -632,6 +632,8 @@ async function performDocumentTranslation(docType, docId, sourceLang, targetLang
     // Nettoyage de l'interface ---
     document.getElementById('setup-section').style.display = 'none';
     document.getElementById('translation-controls').style.display = 'none';
+    const urlFeedback = document.getElementById('url-feedback');
+    if (urlFeedback) urlFeedback.style.display = 'none';
         
     // Afficher le bouton reset
     const resetSection = document.getElementById('reset-section');
@@ -1010,6 +1012,14 @@ window.addEventListener('load', () => {
     document.getElementById('urlInput').value = docUrl;
     // On cache uniquement le setup URL/PDF, mais on garde les contrôles de langue
     document.getElementById('setup-section').style.display = 'none';
+    // Afficher un feedback de chargement
+    const controls = document.getElementById('translation-controls');
+    const feedbackDiv = document.createElement('div');
+    feedbackDiv.id = 'url-feedback';
+    feedbackDiv.style.cssText = 'width: 100%; text-align: center; margin-bottom: 10px; color: #27ae60; font-weight: bold; background: #e8f8f5; padding: 10px; border-radius: 8px;';
+    feedbackDiv.innerHTML = '✅ Document détecté. Choisissez la langue de destination.';
+    // Insérer le feedback juste avant les sélecteurs de langue
+    controls.insertBefore(feedbackDiv, controls.firstChild);
   }
 });
 // ============================================================
