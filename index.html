@@ -134,27 +134,29 @@
 
   <!-- Scripts -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.10.377/pdf.min.js"></script>
-  <script src="scripts/docutranslate.js">
+  <script src="scripts/docutranslate.js"></script>
+  <script>
       document.getElementById('fileInput').addEventListener('change', function(event) {
-      const file = event.target.files[0];
-      if (!file) return;
-    
-      // Afficher le nom du fichier
-      const nameDisplay = document.getElementById('fileNameDisplay');
-      if (nameDisplay) {
-        nameDisplay.textContent = file.name;
-        nameDisplay.style.display = 'block';
-      }
-      
-      // Activer le mode focus
-      const setupSection = document.getElementById('setup-section');
-      if (setupSection) setupSection.style.display = 'none';
-      
-      // --- Placer ici la logique PDF.js existante de ton ancien fichier pdf.html ---
-      // (Extraction du texte, affichage du visualiseur PDF et appel de la fonction de traduction)
-      // ...
-    });
-    </script>
+          const file = event.target.files[0];
+          if (!file) return;
+  
+          // Afficher le nom du fichier
+          const nameDisplay = document.getElementById('fileNameDisplay');
+          if (nameDisplay) {
+              nameDisplay.textContent = file.name;
+              nameDisplay.style.display = 'block';
+          }
+  
+          // Activer le mode focus
+          const setupSection = document.getElementById('setup-section');
+          if (setupSection) setupSection.style.display = 'none';
+  
+          // Lancer la traduction PDF
+          // Note: Tu dois t'assurer que la fonction 'translatePDF' (définie dans docutranslate.js) 
+          // puisse traiter le fichier.
+          translatePDF(); 
+      });
+  </script>
 </body>
 </html>
 
