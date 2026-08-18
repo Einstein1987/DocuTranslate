@@ -494,6 +494,49 @@ iframe {
 }
 
 /* ============================================================
+   PIED DE PAGE DU DÉVELOPPEUR
+   ============================================================ */
+
+.app-footer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  width: fit-content;
+  max-width: min(42rem, calc(100% - 2rem));
+  margin: 16px auto 0;
+  border: 1px solid rgba(189, 195, 199, 0.75);
+  border-radius: 15px;
+  padding: 12px 20px;
+  color: var(--text-dark);
+  background: white;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  font-size: 14px;
+  text-align: center;
+}
+
+.app-footer p {
+  margin: 0;
+}
+
+.app-footer a {
+  color: var(--primary-hover);
+  font-weight: 700;
+  text-underline-offset: 3px;
+}
+
+.app-footer a:hover {
+  color: var(--primary-color);
+}
+
+.app-footer__avatar {
+  width: auto;
+  height: 52px;
+  flex: 0 0 auto;
+  object-fit: contain;
+}
+
+/* ============================================================
    ACCESSIBILITÉ
    ============================================================ */
 
@@ -631,6 +674,15 @@ body.keyboard-navigation *:focus {
   }
 }
 
+@media (max-width: 768px) {
+  .app-footer {
+    flex-direction: column;
+    gap: 6px;
+    max-width: 100%;
+    padding-block: 16px;
+  }
+}
+
 @media (max-width: 480px) {
   h1 {
     font-size: 1.5em;
@@ -658,3 +710,10 @@ body.keyboard-navigation *:focus {
 
 
 
+
+
+@media print {
+  .app-footer {
+    display: none;
+  }
+}
